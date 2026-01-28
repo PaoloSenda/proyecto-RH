@@ -1,0 +1,2214 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Panel de control de Recursos Humanos - Dashboard Ejecutivo de Nomina">
+    <title>HR Analytics - Dashboard Ejecutivo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+
+        :root {
+            --brand-red: #E30613;
+            --brand-dark: #2D3134;
+            --brand-slate: #4A4F54;
+        }
+
+        .bg-brand-red { background-color: var(--brand-red); }
+        .text-brand-red { color: var(--brand-red); }
+        .border-brand-red { border-color: var(--brand-red); }
+
+        .stat-card { transition: all 0.3s ease; }
+        .stat-card:hover { transform: translateY(-4px); box-shadow: 0 12px 20px -5px rgba(227, 6, 19, 0.1); }
+
+        .chart-wrapper { position: relative; height: 280px; }
+        .chart-wrapper-lg { position: relative; height: 320px; }
+
+        .custom-gradient {
+            background: linear-gradient(135deg, #2D3134 0%, #E30613 100%);
+        }
+
+        select {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%234A4F54'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 0.75rem center;
+            background-size: 1em;
+        }
+
+        .spinner {
+            border: 3px solid rgba(227, 6, 19, 0.1);
+            border-top: 3px solid var(--brand-red);
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            padding: 1rem 1.5rem;
+            border-radius: 1rem;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            transform: translateY(150%);
+            transition: transform 0.3s ease;
+            z-index: 100;
+        }
+        .toast.show { transform: translateY(0); }
+        .toast.success { background: #10B981; color: white; }
+        .toast.error { background: #EF4444; color: white; }
+        .toast.warning { background: #F59E0B; color: white; }
+
+        .mobile-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 40;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+        }
+        .mobile-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .mobile-sidebar {
+            transform: translateX(-100%);
+            transition: transform 0.3s ease;
+        }
+        .mobile-sidebar.active {
+            transform: translateX(0);
+        }
+
+        button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible {
+            outline: 2px solid var(--brand-red);
+            outline-offset: 2px;
+        }
+
+        .skip-link {
+            position: absolute;
+            top: -40px;
+            left: 0;
+            background: var(--brand-red);
+            color: white;
+            padding: 8px 16px;
+            z-index: 100;
+            transition: top 0.3s;
+        }
+        .skip-link:focus {
+            top: 0;
+        }
+
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 1rem;
+        }
+
+        @media (min-width: 1280px) {
+            .kpi-grid {
+                grid-template-columns: repeat(5, 1fr);
+            }
+        }
+
+        .tab-btn {
+            transition: all 0.2s ease;
+        }
+        .tab-btn.active {
+            background: var(--brand-red);
+            color: white;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+
+        .metric-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        .metric-row:last-child {
+            border-bottom: none;
+        }
+
+        .scrollbar-thin::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .scrollbar-thin::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 3px;
+        }
+        .scrollbar-thin::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+        .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="bg-[#F8F9FA] text-slate-900">
+
+    <a href="#main-content" class="skip-link">Saltar al contenido principal</a>
+    <div id="toast" class="toast" role="alert" aria-live="polite"></div>
+    <div id="mobile-overlay" class="mobile-overlay xl:hidden" aria-hidden="true"></div>
+
+    <div class="flex min-h-screen">
+        <!-- Sidebar -->
+        <aside id="sidebar" class="w-72 bg-[#1A1C1E] text-white flex flex-col fixed xl:sticky top-0 h-screen border-r border-white/5 z-50 mobile-sidebar xl:transform-none" role="navigation" aria-label="Menu principal">
+            <div class="p-8">
+                <div class="flex flex-col gap-2 mb-10">
+                    <div class="flex items-center gap-3">
+                        <div class="bg-brand-red p-2 rounded-lg" aria-hidden="true">
+                            <i data-lucide="building-2" class="w-6 h-6 text-white"></i>
+                        </div>
+                        <span class="font-bold text-xl tracking-tight">HR <span class="text-brand-red font-black">Analytics</span></span>
+                    </div>
+                    <p class="text-[9px] text-slate-500 font-bold uppercase tracking-[0.2em] ml-11">Dashboard Ejecutivo</p>
+                </div>
+
+                <nav class="space-y-1" aria-label="Navegacion principal">
+                    <p class="text-[10px] uppercase tracking-widest text-slate-600 font-black mb-4 px-3">Analisis</p>
+                    <button type="button" data-tab="overview" class="tab-nav w-full flex items-center gap-4 p-3 bg-brand-red text-white rounded-xl shadow-lg shadow-brand-red/20" aria-current="page">
+                        <i data-lucide="layout-dashboard" class="w-5 h-5" aria-hidden="true"></i>
+                        <span>Vista General</span>
+                    </button>
+                    <button type="button" data-tab="workforce" class="tab-nav w-full flex items-center gap-4 p-3 hover:bg-white/5 rounded-xl transition-all text-slate-400 hover:text-white">
+                        <i data-lucide="users" class="w-5 h-5" aria-hidden="true"></i>
+                        <span>Plantilla</span>
+                    </button>
+                    <button type="button" data-tab="compensation" class="tab-nav w-full flex items-center gap-4 p-3 hover:bg-white/5 rounded-xl transition-all text-slate-400 hover:text-white">
+                        <i data-lucide="wallet" class="w-5 h-5" aria-hidden="true"></i>
+                        <span>Compensaciones</span>
+                    </button>
+                    <button type="button" data-tab="deductions" class="tab-nav w-full flex items-center gap-4 p-3 hover:bg-white/5 rounded-xl transition-all text-slate-400 hover:text-white">
+                        <i data-lucide="receipt" class="w-5 h-5" aria-hidden="true"></i>
+                        <span>Deducciones</span>
+                    </button>
+                    <button type="button" data-tab="employer-costs" class="tab-nav w-full flex items-center gap-4 p-3 hover:bg-white/5 rounded-xl transition-all text-slate-400 hover:text-white">
+                        <i data-lucide="landmark" class="w-5 h-5" aria-hidden="true"></i>
+                        <span>Cargas Patronales</span>
+                    </button>
+                </nav>
+
+                <div class="mt-8">
+                    <p class="text-[10px] uppercase tracking-widest text-slate-600 font-black mb-4 px-3">Reportes</p>
+                    <button type="button" data-tab="detailed" class="tab-nav w-full flex items-center gap-4 p-3 hover:bg-white/5 rounded-xl transition-all text-slate-400 hover:text-white">
+                        <i data-lucide="table-2" class="w-5 h-5" aria-hidden="true"></i>
+                        <span>Detalle Individual</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="mt-auto p-8">
+                <div class="bg-white/5 rounded-2xl p-5 border border-white/10">
+                    <div class="flex items-center gap-2 text-brand-red mb-3">
+                        <i data-lucide="shield-check" class="w-4 h-4" aria-hidden="true"></i>
+                        <span class="text-[10px] font-bold uppercase tracking-wider">Enterprise</span>
+                    </div>
+                    <p class="text-[11px] text-slate-400 leading-relaxed">Dashboard optimizado para empresas de 5,000+ empleados.</p>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <div class="flex-1 flex flex-col">
+            <header class="bg-white border-b border-slate-200 p-5 sticky top-0 z-30 flex justify-between items-center px-6 xl:px-10 shadow-sm" role="banner">
+                <div class="flex items-center gap-4">
+                    <button type="button" id="mobile-menu-btn" class="xl:hidden p-2 rounded-lg hover:bg-slate-100 transition-colors" aria-label="Abrir menu de navegacion" aria-expanded="false" aria-controls="sidebar">
+                        <i data-lucide="menu" class="w-6 h-6 text-slate-600"></i>
+                    </button>
+                    <h1 class="text-sm font-black text-brand-dark uppercase tracking-widest">Dashboard de Capital Humano</h1>
+                </div>
+
+                <div class="flex items-center gap-4 xl:gap-6">
+                    <label for="file-input" class="group flex items-center gap-2 xl:gap-3 bg-brand-red hover:bg-red-700 text-white px-4 xl:px-6 py-2.5 rounded-full cursor-pointer transition-all duration-300 shadow-lg shadow-red-500/20 text-xs font-bold">
+                        <i data-lucide="upload-cloud" class="w-4 h-4" aria-hidden="true"></i>
+                        <span class="hidden sm:inline">CARGAR ARCHIVO</span>
+                        <span class="sm:hidden">CARGAR</span>
+                        <input type="file" id="file-input" class="sr-only" accept=".csv,.xlsx,.xls" aria-describedby="file-hint">
+                    </label>
+                    <span id="file-hint" class="sr-only">Seleccione un archivo CSV o Excel con datos de nomina</span>
+
+                    <div id="loading-indicator" class="hidden items-center gap-2">
+                        <div class="spinner"></div>
+                        <span class="text-xs text-slate-500 font-medium">Procesando...</span>
+                    </div>
+
+                    <div class="h-8 w-px bg-slate-200 hidden xl:block"></div>
+                    <div class="hidden xl:flex items-center gap-3">
+                        <div class="text-right">
+                            <p class="text-xs font-bold text-brand-dark">Administrador</p>
+                            <p class="text-[10px] text-slate-400">RRHH / Nominas</p>
+                        </div>
+                        <div class="w-10 h-10 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center" aria-hidden="true">
+                            <i data-lucide="user" class="w-5 h-5 text-slate-400"></i>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <main id="main-content" class="p-4 xl:p-8 space-y-6 max-w-[1800px] mx-auto w-full" role="main">
+
+                <!-- Hero Section -->
+                <section class="relative h-36 rounded-[2rem] overflow-hidden custom-gradient shadow-xl" aria-labelledby="hero-title">
+                    <div class="absolute inset-0 opacity-20 pointer-events-none" aria-hidden="true">
+                        <svg width="100%" height="100%"><rect width="100%" height="100%" fill="url(#grid)"/><defs><pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse"><path d="M 40 0 L 0 0 0 40" fill="none" stroke="white" stroke-width="1"/></pattern></defs></svg>
+                    </div>
+                    <div class="relative h-full flex flex-col justify-center px-6 xl:px-12 text-white">
+                        <div class="flex items-center gap-3 mb-2">
+                            <span class="bg-white/20 backdrop-blur-sm text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest">Reporte Consolidado</span>
+                            <time id="current-date" class="text-[10px] font-bold opacity-80 uppercase tracking-widest" datetime="">--</time>
+                        </div>
+                        <h2 id="hero-title" class="text-2xl xl:text-3xl font-black tracking-tight">Analisis Integral de Nomina</h2>
+                        <p class="text-white/70 text-sm max-w-lg mt-1 font-medium italic">Visibilidad completa: percepciones, deducciones, cargas patronales y metricas de plantilla.</p>
+                    </div>
+                </section>
+
+                <!-- Filters Section -->
+                <section class="bg-white p-4 xl:p-6 rounded-2xl border border-slate-200 shadow-sm" aria-label="Filtros">
+                    <div class="flex flex-wrap items-center gap-4">
+                        <div class="flex items-center gap-2 text-slate-500">
+                            <i data-lucide="filter" class="w-4 h-4" aria-hidden="true"></i>
+                            <span class="text-xs font-bold uppercase">Filtros:</span>
+                        </div>
+
+                        <div class="flex-1 flex flex-wrap gap-3">
+                            <select id="division-filter" class="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold py-2.5 px-4 rounded-xl outline-none focus:ring-2 focus:ring-brand-red transition-all cursor-pointer min-w-[160px]">
+                                <option value="ALL">Todas las Divisiones</option>
+                            </select>
+
+                            <select id="cost-center-filter" class="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold py-2.5 px-4 rounded-xl outline-none focus:ring-2 focus:ring-brand-red transition-all cursor-pointer min-w-[160px]">
+                                <option value="ALL">Todos los Centros</option>
+                            </select>
+
+                            <select id="job-title-filter" class="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold py-2.5 px-4 rounded-xl outline-none focus:ring-2 focus:ring-brand-red transition-all cursor-pointer min-w-[160px]">
+                                <option value="ALL">Todos los Puestos</option>
+                            </select>
+
+                            <select id="specialist-company-filter" class="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold py-2.5 px-4 rounded-xl outline-none focus:ring-2 focus:ring-brand-red transition-all cursor-pointer min-w-[180px]">
+                                <option value="ALL">Todas las Empresas</option>
+                            </select>
+
+                            <select id="seniority-filter" class="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold py-2.5 px-4 rounded-xl outline-none focus:ring-2 focus:ring-brand-red transition-all cursor-pointer min-w-[140px]">
+                                <option value="ALL">Toda Antiguedad</option>
+                                <option value="0-1">0-1 anos</option>
+                                <option value="1-3">1-3 anos</option>
+                                <option value="3-5">3-5 anos</option>
+                                <option value="5-10">5-10 anos</option>
+                                <option value="10+">10+ anos</option>
+                            </select>
+
+                            <select id="salary-range-filter" class="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold py-2.5 px-4 rounded-xl outline-none focus:ring-2 focus:ring-brand-red transition-all cursor-pointer min-w-[160px]">
+                                <option value="ALL">Todo Salario</option>
+                                <option value="0-500">$0 - $500/dia</option>
+                                <option value="500-1000">$500 - $1,000/dia</option>
+                                <option value="1000-2000">$1,000 - $2,000/dia</option>
+                                <option value="2000+">$2,000+/dia</option>
+                            </select>
+                        </div>
+
+                        <button type="button" id="reset-filters" class="hidden py-2 px-4 bg-slate-100 hover:bg-slate-200 rounded-xl text-xs font-bold transition-colors text-slate-600">
+                            <i data-lucide="x" class="w-3 h-3 inline mr-1" aria-hidden="true"></i>
+                            Limpiar
+                        </button>
+                    </div>
+                    <div id="filter-status" class="mt-3 text-xs text-slate-500 hidden">
+                        <span class="font-semibold">Filtros activos:</span> <span id="active-filters-text"></span>
+                    </div>
+                </section>
+
+                <!-- Tab Content: Overview -->
+                <div id="tab-overview" class="tab-content active space-y-6">
+
+                    <!-- KPI Cards Row 1 - Main Metrics -->
+                    <section aria-label="Indicadores principales">
+                        <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Metricas Principales</h3>
+                        <div class="kpi-grid">
+                            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 stat-card">
+                                <div class="flex justify-between items-start mb-2">
+                                    <div>
+                                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Plantilla Total</p>
+                                        <h3 id="kpi-headcount" class="text-2xl font-black text-brand-dark" aria-live="polite">0</h3>
+                                    </div>
+                                    <div class="p-2 bg-red-50 text-brand-red rounded-xl" aria-hidden="true"><i data-lucide="users" class="w-4 h-4"></i></div>
+                                </div>
+                                <p class="text-[9px] text-slate-400 font-bold">Empleados unicos</p>
+                            </div>
+
+                            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 stat-card border-b-4 border-b-emerald-500">
+                                <div class="flex justify-between items-start mb-2">
+                                    <div>
+                                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Percepciones</p>
+                                        <h3 id="kpi-gross" class="text-2xl font-black text-emerald-600" aria-live="polite">$0</h3>
+                                    </div>
+                                    <div class="p-2 bg-emerald-50 text-emerald-600 rounded-xl" aria-hidden="true"><i data-lucide="trending-up" class="w-4 h-4"></i></div>
+                                </div>
+                                <p class="text-[9px] text-slate-400 font-bold">Total bruto</p>
+                            </div>
+
+                            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 stat-card border-b-4 border-b-rose-500">
+                                <div class="flex justify-between items-start mb-2">
+                                    <div>
+                                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Deducciones</p>
+                                        <h3 id="kpi-deductions" class="text-2xl font-black text-rose-600" aria-live="polite">$0</h3>
+                                    </div>
+                                    <div class="p-2 bg-rose-50 text-rose-600 rounded-xl" aria-hidden="true"><i data-lucide="trending-down" class="w-4 h-4"></i></div>
+                                </div>
+                                <p class="text-[9px] text-slate-400 font-bold">Total retenido</p>
+                            </div>
+
+                            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 stat-card border-b-4 border-b-blue-500">
+                                <div class="flex justify-between items-start mb-2">
+                                    <div>
+                                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Neto a Pagar</p>
+                                        <h3 id="kpi-net" class="text-2xl font-black text-blue-600" aria-live="polite">$0</h3>
+                                    </div>
+                                    <div class="p-2 bg-blue-50 text-blue-600 rounded-xl" aria-hidden="true"><i data-lucide="banknote" class="w-4 h-4"></i></div>
+                                </div>
+                                <p class="text-[9px] text-slate-400 font-bold">Percepciones - Deducciones</p>
+                            </div>
+
+                            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 stat-card border-b-4 border-b-amber-500">
+                                <div class="flex justify-between items-start mb-2">
+                                    <div>
+                                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Carga Patronal</p>
+                                        <h3 id="kpi-employer-cost" class="text-2xl font-black text-amber-600" aria-live="polite">$0</h3>
+                                    </div>
+                                    <div class="p-2 bg-amber-50 text-amber-600 rounded-xl" aria-hidden="true"><i data-lucide="landmark" class="w-4 h-4"></i></div>
+                                </div>
+                                <p class="text-[9px] text-slate-400 font-bold">IMSS + INFONAVIT Patron</p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- KPI Cards Row 2 - Secondary Metrics -->
+                    <section aria-label="Indicadores secundarios">
+                        <h3 class="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">Metricas de Compensacion</h3>
+                        <div class="kpi-grid">
+                            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 stat-card">
+                                <div class="flex justify-between items-start mb-2">
+                                    <div>
+                                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Salario Promedio</p>
+                                        <h3 id="kpi-avg-salary" class="text-2xl font-black text-brand-dark" aria-live="polite">$0</h3>
+                                    </div>
+                                    <div class="p-2 bg-slate-50 text-slate-500 rounded-xl" aria-hidden="true"><i data-lucide="calculator" class="w-4 h-4"></i></div>
+                                </div>
+                                <p class="text-[9px] text-slate-400 font-bold">Por dia</p>
+                            </div>
+
+                            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 stat-card">
+                                <div class="flex justify-between items-start mb-2">
+                                    <div>
+                                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Tiempo Extra</p>
+                                        <h3 id="kpi-overtime" class="text-2xl font-black text-brand-dark" aria-live="polite">$0</h3>
+                                    </div>
+                                    <div class="p-2 bg-slate-50 text-slate-500 rounded-xl" aria-hidden="true"><i data-lucide="clock" class="w-4 h-4"></i></div>
+                                </div>
+                                <p class="text-[9px] text-slate-400 font-bold">Doble + Triple</p>
+                            </div>
+
+                            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 stat-card">
+                                <div class="flex justify-between items-start mb-2">
+                                    <div>
+                                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Antiguedad Prom.</p>
+                                        <h3 id="kpi-avg-seniority" class="text-2xl font-black text-brand-dark" aria-live="polite">0</h3>
+                                    </div>
+                                    <div class="p-2 bg-slate-50 text-slate-500 rounded-xl" aria-hidden="true"><i data-lucide="calendar-days" class="w-4 h-4"></i></div>
+                                </div>
+                                <p class="text-[9px] text-slate-400 font-bold">Anos</p>
+                            </div>
+
+                            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 stat-card">
+                                <div class="flex justify-between items-start mb-2">
+                                    <div>
+                                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Costo por Empleado</p>
+                                        <h3 id="kpi-cost-per-emp" class="text-2xl font-black text-brand-dark" aria-live="polite">$0</h3>
+                                    </div>
+                                    <div class="p-2 bg-slate-50 text-slate-500 rounded-xl" aria-hidden="true"><i data-lucide="user-check" class="w-4 h-4"></i></div>
+                                </div>
+                                <p class="text-[9px] text-slate-400 font-bold">Promedio total</p>
+                            </div>
+
+                            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 stat-card">
+                                <div class="flex justify-between items-start mb-2">
+                                    <div>
+                                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">ISR Total</p>
+                                        <h3 id="kpi-isr" class="text-2xl font-black text-brand-dark" aria-live="polite">$0</h3>
+                                    </div>
+                                    <div class="p-2 bg-slate-50 text-slate-500 rounded-xl" aria-hidden="true"><i data-lucide="file-text" class="w-4 h-4"></i></div>
+                                </div>
+                                <p class="text-[9px] text-slate-400 font-bold">Retenido</p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <!-- Charts Row -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <!-- Cost Structure Chart -->
+                        <section class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm" aria-labelledby="chart-cost-title">
+                            <div class="flex justify-between items-center mb-6">
+                                <div>
+                                    <h2 id="chart-cost-title" class="text-base font-black text-brand-dark">Estructura de Costos</h2>
+                                    <p class="text-[10px] text-slate-400 font-medium uppercase">Por Centro de Costo (Top 8)</p>
+                                </div>
+                                <div class="flex gap-2">
+                                    <span class="flex items-center gap-1 text-[9px] font-bold text-slate-500">
+                                        <span class="w-2 h-2 bg-[#E30613] rounded-full"></span>Base
+                                    </span>
+                                    <span class="flex items-center gap-1 text-[9px] font-bold text-slate-500">
+                                        <span class="w-2 h-2 bg-[#2D3134] rounded-full"></span>T.Extra
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="chart-wrapper">
+                                <canvas id="costStructureChart"></canvas>
+                            </div>
+                        </section>
+
+                        <!-- Distribution by Job Chart -->
+                        <section class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm" aria-labelledby="chart-jobs-title">
+                            <div class="mb-6">
+                                <h2 id="chart-jobs-title" class="text-base font-black text-brand-dark">Distribucion por Puesto</h2>
+                                <p class="text-[10px] text-slate-400 font-medium uppercase">Top 8 Puestos por Costo</p>
+                            </div>
+                            <div class="chart-wrapper">
+                                <canvas id="jobDistributionChart"></canvas>
+                            </div>
+                        </section>
+                    </div>
+
+                    <!-- Second Charts Row -->
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <!-- Compensation Breakdown -->
+                        <section class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm" aria-labelledby="chart-comp-title">
+                            <div class="mb-6">
+                                <h2 id="chart-comp-title" class="text-base font-black text-brand-dark">Composicion Salarial</h2>
+                                <p class="text-[10px] text-slate-400 font-medium uppercase">Desglose de Percepciones</p>
+                            </div>
+                            <div class="chart-wrapper">
+                                <canvas id="compensationChart"></canvas>
+                            </div>
+                        </section>
+
+                        <!-- Deductions Breakdown -->
+                        <section class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm" aria-labelledby="chart-ded-title">
+                            <div class="mb-6">
+                                <h2 id="chart-ded-title" class="text-base font-black text-brand-dark">Desglose de Deducciones</h2>
+                                <p class="text-[10px] text-slate-400 font-medium uppercase">Principales Conceptos</p>
+                            </div>
+                            <div class="chart-wrapper">
+                                <canvas id="deductionsChart"></canvas>
+                            </div>
+                        </section>
+
+                        <!-- Seniority Distribution -->
+                        <section class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm" aria-labelledby="chart-sen-title">
+                            <div class="mb-6">
+                                <h2 id="chart-sen-title" class="text-base font-black text-brand-dark">Distribucion por Antiguedad</h2>
+                                <p class="text-[10px] text-slate-400 font-medium uppercase">Anos de Servicio</p>
+                            </div>
+                            <div class="chart-wrapper">
+                                <canvas id="seniorityChart"></canvas>
+                            </div>
+                        </section>
+                    </div>
+                </div>
+
+                <!-- Tab Content: Workforce -->
+                <div id="tab-workforce" class="tab-content space-y-6">
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <section class="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                            <h2 class="text-base font-black text-brand-dark mb-6">Distribucion de Plantilla por Division</h2>
+                            <div class="chart-wrapper-lg">
+                                <canvas id="divisionChart"></canvas>
+                            </div>
+                        </section>
+
+                        <section class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                            <h2 class="text-base font-black text-brand-dark mb-4">Resumen de Plantilla</h2>
+                            <div id="workforce-summary" class="space-y-1">
+                                <p class="text-slate-400 text-sm italic">Cargue datos para ver el resumen</p>
+                            </div>
+                        </section>
+                    </div>
+
+                    <section class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                        <h2 class="text-base font-black text-brand-dark mb-6">Top 15 Puestos por Numero de Empleados</h2>
+                        <div class="chart-wrapper-lg">
+                            <canvas id="topJobsChart"></canvas>
+                        </div>
+                    </section>
+                </div>
+
+                <!-- Tab Content: Compensation -->
+                <div id="tab-compensation" class="tab-content space-y-6">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <section class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                            <h2 class="text-base font-black text-brand-dark mb-4">Desglose de Percepciones</h2>
+                            <div id="compensation-breakdown" class="space-y-1 max-h-[400px] overflow-y-auto scrollbar-thin">
+                                <p class="text-slate-400 text-sm italic">Cargue datos para ver el desglose</p>
+                            </div>
+                        </section>
+
+                        <section class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                            <h2 class="text-base font-black text-brand-dark mb-6">Percepciones por Categoria</h2>
+                            <div class="chart-wrapper-lg">
+                                <canvas id="perceptionCategoryChart"></canvas>
+                            </div>
+                        </section>
+                    </div>
+
+                    <section class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                        <h2 class="text-base font-black text-brand-dark mb-6">Costo Total por Division</h2>
+                        <div class="chart-wrapper-lg">
+                            <canvas id="costByDivisionChart"></canvas>
+                        </div>
+                    </section>
+                </div>
+
+                <!-- Tab Content: Deductions -->
+                <div id="tab-deductions" class="tab-content space-y-6">
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <section class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                            <h2 class="text-base font-black text-brand-dark mb-4">Desglose de Deducciones</h2>
+                            <div id="deductions-breakdown" class="space-y-1 max-h-[400px] overflow-y-auto scrollbar-thin">
+                                <p class="text-slate-400 text-sm italic">Cargue datos para ver el desglose</p>
+                            </div>
+                        </section>
+
+                        <section class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                            <h2 class="text-base font-black text-brand-dark mb-6">Deducciones por Tipo</h2>
+                            <div class="chart-wrapper-lg">
+                                <canvas id="deductionTypeChart"></canvas>
+                            </div>
+                        </section>
+                    </div>
+                </div>
+
+                <!-- Tab Content: Employer Costs -->
+                <div id="tab-employer-costs" class="tab-content space-y-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 stat-card">
+                            <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">IMSS Patronal</p>
+                            <h3 id="kpi-imss-patron" class="text-xl font-black text-brand-dark">$0</h3>
+                        </div>
+                        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 stat-card">
+                            <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">INFONAVIT Patron</p>
+                            <h3 id="kpi-infonavit-patron" class="text-xl font-black text-brand-dark">$0</h3>
+                        </div>
+                        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 stat-card">
+                            <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Retiro (SAR)</p>
+                            <h3 id="kpi-retiro" class="text-xl font-black text-brand-dark">$0</h3>
+                        </div>
+                        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 stat-card">
+                            <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Cesantia y Vejez</p>
+                            <h3 id="kpi-cesantia" class="text-xl font-black text-brand-dark">$0</h3>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <section class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                            <h2 class="text-base font-black text-brand-dark mb-4">Desglose de Cargas Patronales</h2>
+                            <div id="employer-costs-breakdown" class="space-y-1 max-h-[350px] overflow-y-auto scrollbar-thin">
+                                <p class="text-slate-400 text-sm italic">Cargue datos para ver el desglose</p>
+                            </div>
+                        </section>
+
+                        <section class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+                            <h2 class="text-base font-black text-brand-dark mb-6">Composicion Cargas Patronales</h2>
+                            <div class="chart-wrapper">
+                                <canvas id="employerCostsChart"></canvas>
+                            </div>
+                        </section>
+                    </div>
+                </div>
+
+                <!-- Tab Content: Detailed -->
+                <div id="tab-detailed" class="tab-content">
+                    <section class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div class="p-6 border-b border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center bg-[#FDFDFD] gap-4">
+                            <div>
+                                <h2 class="text-lg font-black text-brand-dark tracking-tight">Detalle Individual de Empleados</h2>
+                                <p id="table-subtitle" class="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-1" aria-live="polite">Cargue un archivo para ver detalles</p>
+                            </div>
+                            <div class="relative w-full md:w-80">
+                                <i data-lucide="search" class="w-4 h-4 absolute left-4 top-3.5 text-slate-400" aria-hidden="true"></i>
+                                <input type="search" id="table-search" placeholder="Buscar por nombre o numero..." class="w-full pl-12 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-medium outline-none focus:ring-2 focus:ring-brand-red transition-all" aria-label="Buscar colaboradores">
+                            </div>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left min-w-[1000px]" aria-describedby="table-subtitle">
+                                <thead class="bg-slate-50 text-slate-500 text-[9px] font-black uppercase tracking-wider">
+                                    <tr>
+                                        <th scope="col" class="px-4 py-4">ID</th>
+                                        <th scope="col" class="px-4 py-4">Colaborador</th>
+                                        <th scope="col" class="px-4 py-4">Puesto</th>
+                                        <th scope="col" class="px-4 py-4">Division</th>
+                                        <th scope="col" class="px-4 py-4">Empresa Especialista</th>
+                                        <th scope="col" class="px-4 py-4 text-right">Salario Diario</th>
+                                        <th scope="col" class="px-4 py-4 text-right">Percepciones</th>
+                                        <th scope="col" class="px-4 py-4 text-right">Deducciones</th>
+                                        <th scope="col" class="px-4 py-4 text-right">Neto</th>
+                                        <th scope="col" class="px-4 py-4 text-center">Antiguedad</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="hr-table-body" class="divide-y divide-slate-100 text-sm">
+                                    <tr><td colspan="10" class="py-20 text-center text-slate-300 italic uppercase tracking-widest text-[10px]">Arrastre su archivo CSV o Excel aqui</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div id="pagination-info" class="hidden px-6 py-4 bg-slate-50 border-t border-slate-100 text-xs text-slate-500">
+                            <span id="showing-count"></span>
+                        </div>
+                    </section>
+                </div>
+
+            </main>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            'use strict';
+
+            // ============================================
+            // CONFIGURATION
+            // ============================================
+            const CONFIG = {
+                MAX_TABLE_ROWS: 100,
+                MAX_CHART_ITEMS: 8,
+                DEBOUNCE_DELAY: 300,
+                DATE_LOCALE: 'es-MX',
+                TOAST_DURATION: 4000,
+                DEBUG: false,
+                COLORS: {
+                    brandRed: '#E30613',
+                    brandDark: '#2D3134',
+                    emerald: '#10B981',
+                    blue: '#3B82F6',
+                    amber: '#F59E0B',
+                    rose: '#F43F5E',
+                    violet: '#8B5CF6',
+                    cyan: '#06B6D4',
+                    orange: '#F97316',
+                    lime: '#84CC16'
+                },
+                CHART_COLORS: ['#E30613', '#2D3134', '#10B981', '#3B82F6', '#F59E0B', '#8B5CF6', '#F43F5E', '#06B6D4', '#F97316', '#84CC16']
+            };
+
+            const PERCEPTION_KEYS = [
+                'baseSalary',
+                'seventhDay',
+                'overtimeDouble',
+                'overtimeTriple',
+                'vacation',
+                'vacationBonus',
+                'sundayBonus',
+                'christmasBonus',
+                'productivityBonus',
+                'attendanceBonus',
+                'ptu',
+                'transportAid',
+                'bonus',
+                'incentives',
+                'reward',
+                'retroactive',
+                'restWorked',
+                'holidayWorked',
+                'adjustmentDays',
+                'otherPerceptions'
+            ];
+
+            const DEDUCTION_KEYS = [
+                'isr',
+                'imss',
+                'infonavit',
+                'fonacot',
+                'pension',
+                'unionDues',
+                'cafeteria',
+                'cashbox',
+                'savingsFund',
+                'loan',
+                'toolAdvance',
+                'credit',
+                'shortage',
+                'pettyCashAdvance',
+                'expenseShortage',
+                'excessNextel',
+                'uniforms',
+                'settlement',
+                'excessCell',
+                'discount',
+                'incomeAdjustment',
+                'otherDeductions'
+            ];
+
+            const PERCEPTION_SUM_KEYS = [...PERCEPTION_KEYS];
+            const DEDUCTION_SUM_KEYS = [
+                'isr',
+                'isr131',
+                'imss',
+                'credit',
+                'infonavit',
+                'fonacot',
+                'pension',
+                'unionDues',
+                'cafeteria',
+                'cashbox',
+                'savingsFund',
+                'loan',
+                'specialLoan',
+                'toolAdvance',
+                'shortage',
+                'pettyCashAdvance',
+                'expenseShortage',
+                'excessNextel',
+                'uniforms',
+                'settlement',
+                'excessCell',
+                'discount',
+                'incomeAdjustment',
+                'otherDeductions'
+            ];
+
+            const PERCEPTION_LABELS = {
+                baseSalary: 'Sueldo Base',
+                seventhDay: 'Septimo Dia',
+                overtimeDouble: 'Tiempo Extra Doble',
+                overtimeTriple: 'Tiempo Extra Triple',
+                vacation: 'Vacaciones',
+                vacationBonus: 'Prima Vacacional',
+                sundayBonus: 'Prima Dominical',
+                christmasBonus: 'Aguinaldo',
+                productivityBonus: 'Premio de Productividad',
+                attendanceBonus: 'Premio de Asistencia',
+                ptu: 'PTU',
+                transportAid: 'Ayuda de Transporte',
+                bonus: 'Bonos',
+                incentives: 'Incentivos',
+                reward: 'Recompensas',
+                retroactive: 'Retroactivo',
+                restWorked: 'Descanso Laborado',
+                holidayWorked: 'Festivo Laborado',
+                adjustmentDays: 'Dias de Ajuste',
+                otherPerceptions: 'Otras Percepciones'
+            };
+
+            const DEDUCTION_LABELS = {
+                isr: 'ISR (Impuesto Sobre la Renta)',
+                imss: 'IMSS (Cuota Obrero)',
+                infonavit: 'INFONAVIT',
+                fonacot: 'FONACOT',
+                pension: 'Pension Alimenticia',
+                unionDues: 'Cuota Sindical',
+                cafeteria: 'Comedor',
+                cashbox: 'Caja',
+                savingsFund: 'Fondo de Ahorro',
+                loan: 'Prestamos',
+                toolAdvance: 'Anticipo de Herramientas',
+                credit: 'Creditos',
+                shortage: 'Faltantes',
+                pettyCashAdvance: 'Anticipo Caja Chica',
+                expenseShortage: 'Faltante de Gastos',
+                excessNextel: 'Exceso Nextel',
+                uniforms: 'Uniformes',
+                settlement: 'Liquidacion',
+                excessCell: 'Exceso Celular',
+                discount: 'Descuentos',
+                incomeAdjustment: 'Ajuste de Ingresos',
+                otherDeductions: 'Otras Deducciones'
+            };
+
+            // Column mapping patterns - flexible matching for different Excel formats
+            const COLUMN_MAP = {
+                // Identification
+                id: ['NUMERO', 'NO', 'ID', 'NUM_EMP', 'EMPLEADO_ID'],
+                name: ['NOMBRE', 'EMPLEADO', 'NAME', 'COLABORADOR'],
+
+                // Organization
+                division: ['DIVISION', 'DIV', 'AREA', 'DEPARTAMENTO', 'DEPTO'],
+                costCenter: ['CENTRO', 'CC', 'CENTRO_COSTO', 'COST_CENTER', 'COSTO'],
+                job: ['PUESTO', 'P_DESC', 'CARGO', 'POSICION', 'CATEGORIA', 'JOB'],
+                specialistCompany: ['EMPRESA ESPECIALISTA', 'EMPRESA_ESPECIALISTA', 'ESPECIALISTA'],
+
+                // Salary & Compensation
+                dailySalary: ['SALARIO DIARIO', 'SALARIO_DIARIO', 'SD', 'SUELDO DIARIO', 'SALARIO', 'SALARIO DIAI', 'SALARIO DIAL'],
+                baseSalary: ['SUELDO', 'SUELDO_BASE', 'SALARIO_BASE', 'BASE'],
+                seventhDay: ['SEPTIMO DIA', 'SEPTIMO_DIA', '7MO DIA'],
+                overtimeDouble: ['TE DOBLE', 'T_EXTRA_DOBLE', 'TIEMPO_EXTRA_DOBLE', 'HORAS_EXTRA_DOBLE'],
+                overtimeTriple: ['TE TRIPLE', 'T_EXTRA_TRIPLE', 'TIEMPO_EXTRA_TRIPLE', 'HORAS_EXTRA_TRIPLE'],
+                vacation: ['VACACIONES', 'VACACION'],
+                vacationBonus: ['PRIMA VACACIONAL', 'PRIMA_VACACIONAL', 'PRIMA_VAC'],
+                sundayBonus: ['PRIMA DOMINICAL', 'PRIMA_DOMINICAL'],
+                otherPerceptions: ['OTRAS PERCEPCIONES', 'OTRAS PERC', 'OTRAS_PERCEPCIONES'],
+                christmasBonus: ['AGUINALDO'],
+                adjustmentDays: ['DIAS DE AJUSTE', 'DIAS_AJUSTE'],
+                productivityBonus: ['PREMIO DE PRODUCTIVIDAD', 'PREMIO_PRODUCTIVIDAD', 'BONO_PRODUCTIVIDAD'],
+                attendanceBonus: ['PREMIO DE ASISTENCIA', 'PREMIO_ASISTENCIA', 'BONO_ASISTENCIA'],
+                ptu: ['PTU', 'PARTICIPACION'],
+                retroactive: ['RETROACTIVO', 'RETROACTIVOS'],
+                restWorked: ['DESCANSO LABORADO', 'DESC_LABORADO'],
+                holidayWorked: ['FESTIVO LABORADO', 'FEST_LABORADO'],
+                transportAid: ['AYUDA DE TRANSPORTE', 'AYUDA_TRANSPORTE', 'TRANSPORTE'],
+                bonus: ['BONO', 'BONOS', 'BONO_EXTRA'],
+                reward: ['RECOMPENSA', 'RECOMPENSAS'],
+                incentives: ['INCENTIVOS', 'INCENTIVO'],
+                totalPerception: ['PERCEPCION', 'PERCEPCIONES', 'TOTAL_PERCEPCION', 'BRUTO'],
+                totalNet: ['TOTAL NETO', 'NETO'],
+
+                // Deductions
+                isr: ['ISR', 'ISR RETENIDO'],
+                isr131: ['ISR (131)', 'ISR_131'],
+                imss: ['IMSS', 'CUOTA_IMSS', 'IMSS_OBRERO'],
+                credit: ['CREDITO', 'CREDITOS'],
+                infonavit: ['INFONAVIT', 'INFONAVIT_TRABAJADOR'],
+                fonacot: ['FONACOT'],
+                pension: ['PENSION', 'PENSIONES'],
+                unionDues: ['CUOTA SINDICAL', 'CUOTA_SINDICAL', 'SINDICATO'],
+                cafeteria: ['COMEDOR', 'ALIMENTOS'],
+                cashbox: ['CAJA'],
+                savingsFund: ['FONDO DE AHORRO', 'FONDO_AHORRO', 'AHORRO'],
+                loan: ['PRESTAMO', 'PRESTAMOS'],
+                toolAdvance: ['ANTICIPO DE HERRAMIENTAS', 'ANTICIPO_HERRAMIENTAS'],
+                specialLoan: ['PRESTAMO ESPECIAL', 'PRESTAMO_ESPECIAL'],
+                shortage: ['FALTANTE', 'FALTANTES'],
+                pettyCashAdvance: ['ANTICIPO DE CAJA CHICA', 'ANTICIPO_CAJA'],
+                expenseShortage: ['FALTANTE DE GASTOS', 'FALTANTE_GASTOS'],
+                excessNextel: ['EXCESO NEXTEL', 'POR EXCESO NEXTEL'],
+                uniforms: ['UNIFORMES', 'UNIFORME'],
+                settlement: ['LIQUIDACION'],
+                excessCell: ['EXCESO CEL', 'EXCESO_CELULAR'],
+                discount: ['DESCUENTO', 'DESCUENTOS'],
+                incomeAdjustment: ['AJUSTE DE INGRESOS', 'AJUSTE_INGRESOS'],
+                otherDeductions: ['OTRAS DEDUCCIONES', 'OTRAS_DEDUCCIONES', 'OTRAS DED'],
+                totalDeduction: ['DEDUCCION', 'DEDUCCIONES', 'TOTAL_DEDUCCION'],
+
+                // Employer Costs
+                imssPatron: ['IMSS PATRON', 'IMSS_PATRONAL', 'IMSS EMPRESA', 'IMSS_EMPRESA', 'IMSS EMPRE'],
+                infonavitPatron: ['INFONAVIT 5%', 'INFONAVIT_PATRON', 'INFONAVIT_5', 'INFONAVIT 5'],
+                retirement: ['RETIRO', 'SAR', 'RETIRO_SAR'],
+                severanceOldAge: ['CESANTIA', 'CESANTIA Y VEJEZ', 'CESANTIA_VEJEZ', 'CESANTIA Y V'],
+
+                // Other fields
+                seniority: ['ANTIGUEDAD', 'ANTIGUEDAD_ANOS', 'ANOS_SERVICIO'],
+                hireDate: ['FECHA DE INGRESO', 'FECHA_INGRESO', 'FECHA_ALTA'],
+                dailyAverage: ['PROMEDIO DIARIO', 'PROMEDIO_DIARIO'],
+                imssDaily: ['SALARIO DIARIO PARA ISR', 'SD_ISR'],
+                vacationDays: ['DiasVac', 'DIAS_VACACIONES', 'DIAS_VAC']
+            };
+
+            // ============================================
+            // STATE
+            // ============================================
+            let state = {
+                rawData: [],
+                filteredData: [],
+                charts: {},
+                columnMapping: {},
+                isLoading: false,
+                toastTimeout: null
+            };
+
+            // ============================================
+            // UTILITIES
+            // ============================================
+
+            function escapeHtml(text) {
+                if (text == null) return '';
+                const div = document.createElement('div');
+                div.textContent = String(text);
+                return div.innerHTML;
+            }
+
+            function logDebug(...args) {
+                if (CONFIG.DEBUG) {
+                    console.log(...args);
+                }
+            }
+
+            function normalizeSearchText(value) {
+                const text = String(value || '');
+                const normalized = text.normalize ? text.normalize('NFD') : text;
+                return normalized
+                    .replace(/[\u0300-\u036f]/g, '')
+                    .toLowerCase()
+                    .trim();
+            }
+
+            function parseNumber(value) {
+                if (value === null || value === undefined || value === '') return 0;
+                if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
+
+                let str = String(value).trim();
+                if (!str) return 0;
+
+                let negative = false;
+                if (str.includes('(') && str.includes(')')) {
+                    negative = true;
+                    str = str.replace(/[()]/g, '');
+                }
+
+                str = str.replace(/[%\s]/g, '');
+                str = str.replace(/[^0-9,.\-]/g, '');
+
+                const lastComma = str.lastIndexOf(',');
+                const lastDot = str.lastIndexOf('.');
+
+                if (lastComma !== -1 && lastDot !== -1) {
+                    if (lastComma > lastDot) {
+                        str = str.replace(/\./g, '');
+                        str = str.replace(',', '.');
+                    } else {
+                        str = str.replace(/,/g, '');
+                    }
+                } else if (lastComma !== -1 && lastDot === -1) {
+                    const parts = str.split(',');
+                    const lastPart = parts[parts.length - 1];
+                    if (lastPart.length === 3) {
+                        str = parts.join('');
+                    } else {
+                        str = str.replace(/,/g, '.');
+                    }
+                }
+
+                const num = parseFloat(str);
+                if (!Number.isFinite(num)) return 0;
+                return negative ? -Math.abs(num) : num;
+            }
+
+            function formatCurrency(value, compact = false) {
+                const safeValue = Number.isFinite(value) ? value : parseNumber(value);
+                if (compact) {
+                    if (Math.abs(safeValue) >= 1000000) {
+                        return '$' + (safeValue / 1000000).toFixed(2) + 'M';
+                    }
+                    if (Math.abs(safeValue) >= 1000) {
+                        return '$' + (safeValue / 1000).toFixed(1) + 'k';
+                    }
+                }
+                return '$' + safeValue.toLocaleString(CONFIG.DATE_LOCALE, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                });
+            }
+
+            function formatNumber(value) {
+                const safeValue = Number.isFinite(value) ? value : parseNumber(value);
+                return safeValue.toLocaleString(CONFIG.DATE_LOCALE);
+            }
+
+            function debounce(func, wait) {
+                let timeout;
+                return function(...args) {
+                    clearTimeout(timeout);
+                    timeout = setTimeout(() => func(...args), wait);
+                };
+            }
+
+            function showToast(message, type = 'success') {
+                const toast = document.getElementById('toast');
+                toast.textContent = message;
+                toast.className = `toast ${type} show`;
+                if (state.toastTimeout) {
+                    clearTimeout(state.toastTimeout);
+                }
+                state.toastTimeout = setTimeout(() => toast.classList.remove('show'), CONFIG.TOAST_DURATION);
+            }
+
+            function setLoading(show) {
+                state.isLoading = show;
+                const indicator = document.getElementById('loading-indicator');
+                indicator.classList.toggle('hidden', !show);
+                indicator.classList.toggle('flex', show);
+            }
+
+            function getColumnValue(row, columnKey) {
+                const mappedColumn = state.columnMapping[columnKey];
+                if (mappedColumn && row[mappedColumn] !== undefined) {
+                    return row[mappedColumn];
+                }
+                return '';
+            }
+
+            function getNumericValue(row, columnKey) {
+                return parseNumber(getColumnValue(row, columnKey));
+            }
+
+            function setSelectOptions(selectId, values, allLabel) {
+                const select = document.getElementById(selectId);
+                const fragment = document.createDocumentFragment();
+                const allOption = document.createElement('option');
+                allOption.value = 'ALL';
+                allOption.textContent = allLabel;
+                fragment.appendChild(allOption);
+
+                values.forEach(value => {
+                    const option = document.createElement('option');
+                    option.value = value;
+                    option.textContent = value;
+                    fragment.appendChild(option);
+                });
+
+                select.innerHTML = '';
+                select.appendChild(fragment);
+            }
+
+            function getFilterValues() {
+                return {
+                    division: document.getElementById('division-filter').value,
+                    cc: document.getElementById('cost-center-filter').value,
+                    job: document.getElementById('job-title-filter').value,
+                    specialistCompany: document.getElementById('specialist-company-filter').value,
+                    seniority: document.getElementById('seniority-filter').value,
+                    salaryRange: document.getElementById('salary-range-filter').value,
+                    search: normalizeSearchText(document.getElementById('table-search').value)
+                };
+            }
+
+            // ============================================
+            // COLUMN MAPPING
+            // ============================================
+
+            function buildExcelData(sheet) {
+                const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+
+                if (!rows.length) {
+                    return { data: [], headers: [], headerKeyByLetter: {} };
+                }
+
+                const headerRow = rows[0];
+                const headerInfo = headerRow.map((value, index) => ({
+                    label: String(value || '').trim(),
+                    letter: XLSX.utils.encode_col(index)
+                }));
+
+                const seen = {};
+                const headers = headerInfo.map((info) => {
+                    const base = info.label || `COL_${info.letter}`;
+                    if (seen[base]) {
+                        return `${base} (${info.letter})`;
+                    }
+                    seen[base] = true;
+                    return base;
+                });
+
+                const headerKeyByLetter = {};
+                headerInfo.forEach((info, idx) => {
+                    headerKeyByLetter[info.letter] = headers[idx];
+                });
+
+                const data = rows.slice(1).map(row => {
+                    const obj = {};
+                    headers.forEach((header, idx) => {
+                        obj[header] = row[idx] ?? '';
+                    });
+                    return obj;
+                });
+
+                return { data, headers, headerKeyByLetter };
+            }
+
+            function detectDelimiter(text) {
+                const sample = text.split(/\r?\n/).slice(0, 5).join('\n');
+                const commaCount = (sample.match(/,/g) || []).length;
+                const semicolonCount = (sample.match(/;/g) || []).length;
+                return semicolonCount > commaCount ? ';' : ',';
+            }
+
+            function parseCsvRows(text, delimiter) {
+                const rows = [];
+                let row = [];
+                let field = '';
+                let inQuotes = false;
+
+                for (let i = 0; i < text.length; i++) {
+                    const char = text[i];
+                    const next = text[i + 1];
+
+                    if (char === '"') {
+                        if (inQuotes && next === '"') {
+                            field += '"';
+                            i++;
+                        } else {
+                            inQuotes = !inQuotes;
+                        }
+                    } else if (char === delimiter && !inQuotes) {
+                        row.push(field);
+                        field = '';
+                    } else if ((char === '\n' || char === '\r') && !inQuotes) {
+                        if (char === '\r' && next === '\n') {
+                            i++;
+                        }
+                        row.push(field);
+                        field = '';
+                        if (row.some(cell => String(cell).trim() !== '')) {
+                            rows.push(row);
+                        }
+                        row = [];
+                    } else {
+                        field += char;
+                    }
+                }
+
+                row.push(field);
+                if (row.some(cell => String(cell).trim() !== '')) {
+                    rows.push(row);
+                }
+
+                return rows;
+            }
+
+            function buildCsvData(text) {
+                const delimiter = detectDelimiter(text);
+                const rows = parseCsvRows(text, delimiter);
+
+                if (!rows.length) {
+                    return { data: [], headers: [] };
+                }
+
+                const seen = {};
+                const headers = rows[0].map((h, idx) => {
+                    let cleaned = String(h || '').trim();
+                    cleaned = idx === 0 ? cleaned.replace(/^\uFEFF/, '') : cleaned;
+                    const base = cleaned || `COL_${idx + 1}`;
+                    if (seen[base]) {
+                        seen[base] += 1;
+                        return `${base}_${seen[base]}`;
+                    }
+                    seen[base] = 1;
+                    return base;
+                });
+
+                const data = rows.slice(1).map(row => {
+                    const obj = {};
+                    headers.forEach((header, idx) => {
+                        obj[header] = row[idx] !== undefined ? row[idx] : '';
+                    });
+                    return obj;
+                });
+
+                return { data, headers };
+            }
+
+            function mapColumns(headers, headerKeyByLetter = {}) {
+                state.columnMapping = {};
+                const headerUpper = headers.map(h => h.toUpperCase().trim());
+
+                for (const [key, patterns] of Object.entries(COLUMN_MAP)) {
+                    for (const pattern of patterns) {
+                        const idx = headerUpper.findIndex(h => h === pattern.toUpperCase() || h.includes(pattern.toUpperCase()));
+                        if (idx !== -1) {
+                            state.columnMapping[key] = headers[idx];
+                            break;
+                        }
+                    }
+                }
+
+                const excelOverrides = {
+                    job: 'CX',
+                    seniority: 'CY',
+                    specialistCompany: 'DB'
+                };
+
+                for (const [key, letter] of Object.entries(excelOverrides)) {
+                    if (headerKeyByLetter[letter]) {
+                        state.columnMapping[key] = headerKeyByLetter[letter];
+                    }
+                }
+
+                logDebug('Column mapping:', state.columnMapping);
+            }
+
+            // ============================================
+            // DATA PROCESSING
+            // ============================================
+
+            function processFile(file) {
+                if (!file) return;
+
+                const fileName = file.name.toLowerCase();
+                const isExcel = fileName.endsWith('.xlsx') || fileName.endsWith('.xls');
+                const isCsv = fileName.endsWith('.csv');
+
+                if (!isExcel && !isCsv) {
+                    showToast('Por favor seleccione un archivo CSV o Excel (.xlsx, .xls)', 'error');
+                    return;
+                }
+
+                setLoading(true);
+
+                const reader = new FileReader();
+
+                reader.onerror = function() {
+                    setLoading(false);
+                    showToast('Error al leer el archivo', 'error');
+                };
+
+                reader.onload = function(evt) {
+                    try {
+                        let data;
+
+                        if (isExcel) {
+                            const workbook = XLSX.read(new Uint8Array(evt.target.result), { type: 'array' });
+                            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                            const excelPayload = buildExcelData(firstSheet);
+                            data = excelPayload.data;
+                            mapColumns(excelPayload.headers, excelPayload.headerKeyByLetter);
+                        } else {
+                            const text = evt.target.result;
+                            const csvPayload = buildCsvData(text);
+                            data = csvPayload.data;
+                            mapColumns(csvPayload.headers);
+                        }
+
+                        if (data.length === 0) {
+                            throw new Error('No se encontraron registros en el archivo');
+                        }
+
+                        // Normalize data
+                        state.rawData = data.map(row => {
+                            const id = String(getColumnValue(row, 'id') || '').trim();
+                            const name = String(getColumnValue(row, 'name') || 'SIN NOMBRE').trim();
+                            const division = String(getColumnValue(row, 'division') || 'GENERAL').trim();
+                            const costCenter = String(getColumnValue(row, 'costCenter') || 'GENERAL').trim();
+                            const job = String(getColumnValue(row, 'job') || 'NO DEFINIDO').trim();
+                            const specialistCompany = String(getColumnValue(row, 'specialistCompany') || 'SIN EMPRESA').trim();
+                            const seniorityRaw = parseNumber(getColumnValue(row, 'seniority'));
+                            const dailySalaryRaw = getNumericValue(row, 'dailySalary');
+
+                            return {
+                                ...row,
+                                _id: id,
+                                _name: name.toUpperCase(),
+                                _nameSearch: normalizeSearchText(name),
+                                _idSearch: normalizeSearchText(id),
+                                _division: division.toUpperCase(),
+                                _cc: costCenter.toUpperCase(),
+                                _job: job.toUpperCase(),
+                                _specialistCompany: specialistCompany.toUpperCase(),
+                                _seniority: Math.max(0, seniorityRaw || 0),
+                                _dailySalary: Math.max(0, dailySalaryRaw || 0)
+                            };
+                        }).filter(row => row._id);
+
+                        if (state.rawData.length === 0) {
+                            throw new Error('No se encontraron registros validos con ID de empleado');
+                        }
+
+                        populateFilters();
+                        applyFilters();
+
+                        showToast(`Archivo cargado: ${state.rawData.length.toLocaleString()} registros`, 'success');
+
+                    } catch (error) {
+                        showToast(error.message || 'Error al procesar el archivo', 'error');
+                        console.error('Error procesando archivo:', error);
+                    } finally {
+                        setLoading(false);
+                    }
+                };
+
+                if (isExcel) {
+                    reader.readAsArrayBuffer(file);
+                } else {
+                    reader.readAsText(file);
+                }
+            }
+
+            function populateFilters() {
+                const divisions = [...new Set(state.rawData.map(d => d._division))].filter(Boolean).sort();
+                const costCenters = [...new Set(state.rawData.map(d => d._cc))].filter(Boolean).sort();
+                const jobs = [...new Set(state.rawData.map(d => d._job))].filter(Boolean).sort();
+                const specialistCompanies = [...new Set(state.rawData.map(d => d._specialistCompany))].filter(Boolean).sort();
+
+                setSelectOptions('division-filter', divisions, 'Todas las Divisiones');
+                setSelectOptions('cost-center-filter', costCenters, 'Todos los Centros');
+                setSelectOptions('job-title-filter', jobs, 'Todos los Puestos');
+                setSelectOptions('specialist-company-filter', specialistCompanies, 'Todas las Empresas');
+            }
+
+            function applyFilters() {
+                const { division, cc, job, specialistCompany, seniority, salaryRange, search } = getFilterValues();
+
+                state.filteredData = state.rawData.filter(row => {
+                    if (division !== 'ALL' && row._division !== division) return false;
+                    if (cc !== 'ALL' && row._cc !== cc) return false;
+                    if (job !== 'ALL' && row._job !== job) return false;
+                    if (specialistCompany !== 'ALL' && row._specialistCompany !== specialistCompany) return false;
+
+                    // Seniority filter
+                    if (seniority !== 'ALL') {
+                        const sen = row._seniority;
+                        switch (seniority) {
+                            case '0-1': if (sen >= 1) return false; break;
+                            case '1-3': if (sen < 1 || sen >= 3) return false; break;
+                            case '3-5': if (sen < 3 || sen >= 5) return false; break;
+                            case '5-10': if (sen < 5 || sen >= 10) return false; break;
+                            case '10+': if (sen < 10) return false; break;
+                        }
+                    }
+
+                    // Salary range filter
+                    if (salaryRange !== 'ALL') {
+                        const salary = row._dailySalary;
+                        switch (salaryRange) {
+                            case '0-500': if (salary >= 500) return false; break;
+                            case '500-1000': if (salary < 500 || salary >= 1000) return false; break;
+                            case '1000-2000': if (salary < 1000 || salary >= 2000) return false; break;
+                            case '2000+': if (salary < 2000) return false; break;
+                        }
+                    }
+
+                    // Search filter
+                    if (search) {
+                        const matchName = row._nameSearch.includes(search);
+                        const matchId = row._idSearch.includes(search);
+                        if (!matchName && !matchId) return false;
+                    }
+
+                    return true;
+                });
+
+                updateFilterStatus();
+                updateAllDashboards();
+            }
+
+            function updateFilterStatus() {
+                const { division, cc, job, specialistCompany, seniority, salaryRange } = getFilterValues();
+                const hasFilters = division !== 'ALL' || cc !== 'ALL' || job !== 'ALL' || specialistCompany !== 'ALL' || seniority !== 'ALL' || salaryRange !== 'ALL';
+
+                const resetBtn = document.getElementById('reset-filters');
+                const statusDiv = document.getElementById('filter-status');
+
+                resetBtn.classList.toggle('hidden', !hasFilters);
+                statusDiv.classList.toggle('hidden', !hasFilters);
+
+                if (hasFilters) {
+                    const parts = [];
+                    if (division !== 'ALL') parts.push(`Division: ${division}`);
+                    if (cc !== 'ALL') parts.push(`CC: ${cc}`);
+                    if (job !== 'ALL') parts.push(`Puesto: ${job}`);
+                    if (specialistCompany !== 'ALL') parts.push(`Empresa Especialista: ${specialistCompany}`);
+                    if (seniority !== 'ALL') parts.push(`Antiguedad: ${seniority} anos`);
+                    if (salaryRange !== 'ALL') parts.push(`Salario: $${salaryRange}/dia`);
+                    document.getElementById('active-filters-text').textContent = parts.join(' | ');
+                }
+            }
+
+            function resetFilters() {
+                document.getElementById('division-filter').value = 'ALL';
+                document.getElementById('cost-center-filter').value = 'ALL';
+                document.getElementById('job-title-filter').value = 'ALL';
+                document.getElementById('specialist-company-filter').value = 'ALL';
+                document.getElementById('seniority-filter').value = 'ALL';
+                document.getElementById('salary-range-filter').value = 'ALL';
+                document.getElementById('table-search').value = '';
+                applyFilters();
+            }
+
+            // ============================================
+            // CALCULATIONS
+            // ============================================
+
+            function sumFields(row, keys) {
+                return keys.reduce((sum, key) => sum + getNumericValue(row, key), 0);
+            }
+
+            function computeGross(row) {
+                if (state.columnMapping.totalPerception) {
+                    return getNumericValue(row, 'totalPerception');
+                }
+                return sumFields(row, PERCEPTION_SUM_KEYS);
+            }
+
+            function computeDeductions(row) {
+                if (state.columnMapping.totalDeduction) {
+                    return getNumericValue(row, 'totalDeduction');
+                }
+                return sumFields(row, DEDUCTION_SUM_KEYS);
+            }
+
+            function computeNet(row, gross, deductions) {
+                if (state.columnMapping.totalNet) {
+                    return getNumericValue(row, 'totalNet');
+                }
+                return gross - deductions;
+            }
+
+            function calculateMetrics(data) {
+                const metrics = {
+                    headcount: 0,
+                    totalGross: 0,
+                    totalDeductions: 0,
+                    totalNet: 0,
+                    totalEmployerCost: 0,
+                    totalSalary: 0,
+                    totalOvertime: 0,
+                    totalSeniority: 0,
+                    totalISR: 0,
+
+                    // Employer costs breakdown
+                    imssPatron: 0,
+                    infonavitPatron: 0,
+                    retirement: 0,
+                    severanceOldAge: 0,
+
+                    // Perception breakdown
+                    perceptions: PERCEPTION_KEYS.reduce((acc, key) => {
+                        acc[key] = 0;
+                        return acc;
+                    }, {}),
+
+                    // Deduction breakdown
+                    deductions: DEDUCTION_KEYS.reduce((acc, key) => {
+                        acc[key] = 0;
+                        return acc;
+                    }, {}),
+
+                    // Groupings
+                    byDivision: {},
+                    byCostCenter: {},
+                    byJob: {},
+                    bySpecialistCompany: {},
+                    bySeniority: { '0-1': 0, '1-3': 0, '3-5': 0, '5-10': 0, '10+': 0 }
+                };
+
+                const uniqueEmployees = new Set();
+
+                data.forEach(row => {
+                    const empId = row._id;
+
+                    if (!uniqueEmployees.has(empId)) {
+                        uniqueEmployees.add(empId);
+                        metrics.headcount++;
+
+                        const seniority = row._seniority;
+                        metrics.totalSeniority += seniority;
+                        metrics.totalSalary += row._dailySalary;
+
+                        if (seniority < 1) metrics.bySeniority['0-1']++;
+                        else if (seniority < 3) metrics.bySeniority['1-3']++;
+                        else if (seniority < 5) metrics.bySeniority['3-5']++;
+                        else if (seniority < 10) metrics.bySeniority['5-10']++;
+                        else metrics.bySeniority['10+']++;
+                    }
+
+                    // Calculate totals from each row
+                    const gross = computeGross(row);
+                    const deductions = computeDeductions(row);
+                    const netValue = computeNet(row, gross, deductions);
+
+                    metrics.totalGross += gross;
+                    metrics.totalDeductions += deductions;
+                    metrics.totalNet += netValue;
+
+                    metrics.totalOvertime += getNumericValue(row, 'overtimeDouble') + getNumericValue(row, 'overtimeTriple');
+                    metrics.totalISR += getNumericValue(row, 'isr') + getNumericValue(row, 'isr131');
+
+                    // Employer costs
+                    metrics.imssPatron += getNumericValue(row, 'imssPatron');
+                    metrics.infonavitPatron += getNumericValue(row, 'infonavitPatron');
+                    metrics.retirement += getNumericValue(row, 'retirement');
+                    metrics.severanceOldAge += getNumericValue(row, 'severanceOldAge');
+
+                    // Perceptions breakdown
+                    PERCEPTION_KEYS.forEach(key => {
+                        metrics.perceptions[key] += getNumericValue(row, key);
+                    });
+
+                    // Deductions breakdown (aggregate ISR and Prestamos)
+                    metrics.deductions.isr += getNumericValue(row, 'isr') + getNumericValue(row, 'isr131');
+                    metrics.deductions.loan += getNumericValue(row, 'loan') + getNumericValue(row, 'specialLoan');
+                    DEDUCTION_KEYS.forEach(key => {
+                        if (key === 'isr' || key === 'loan') return;
+                        metrics.deductions[key] += getNumericValue(row, key);
+                    });
+
+                    // By groupings
+                    const division = row._division;
+                    const cc = row._cc;
+                    const job = row._job;
+                    const specialistCompany = row._specialistCompany;
+
+                    if (!metrics.byDivision[division]) {
+                        metrics.byDivision[division] = { count: 0, total: 0, _employees: new Set() };
+                    }
+                    metrics.byDivision[division].total += gross;
+                    metrics.byDivision[division]._employees.add(empId);
+                    metrics.byDivision[division].count = metrics.byDivision[division]._employees.size;
+
+                    if (!metrics.byCostCenter[cc]) {
+                        metrics.byCostCenter[cc] = { count: 0, base: 0, overtime: 0, total: 0, _employees: new Set() };
+                    }
+                    metrics.byCostCenter[cc].base += getNumericValue(row, 'baseSalary');
+                    metrics.byCostCenter[cc].overtime += getNumericValue(row, 'overtimeDouble') + getNumericValue(row, 'overtimeTriple');
+                    metrics.byCostCenter[cc].total += gross;
+                    metrics.byCostCenter[cc]._employees.add(empId);
+                    metrics.byCostCenter[cc].count = metrics.byCostCenter[cc]._employees.size;
+
+                    if (!metrics.byJob[job]) {
+                        metrics.byJob[job] = { count: 0, total: 0, _employees: new Set() };
+                    }
+                    metrics.byJob[job].total += gross;
+                    metrics.byJob[job]._employees.add(empId);
+                    metrics.byJob[job].count = metrics.byJob[job]._employees.size;
+
+                    if (!metrics.bySpecialistCompany[specialistCompany]) {
+                        metrics.bySpecialistCompany[specialistCompany] = { count: 0, total: 0, _employees: new Set() };
+                    }
+                    metrics.bySpecialistCompany[specialistCompany].total += gross;
+                    metrics.bySpecialistCompany[specialistCompany]._employees.add(empId);
+                    metrics.bySpecialistCompany[specialistCompany].count = metrics.bySpecialistCompany[specialistCompany]._employees.size;
+                });
+
+                ['byDivision', 'byCostCenter', 'byJob', 'bySpecialistCompany'].forEach(groupKey => {
+                    Object.values(metrics[groupKey]).forEach(item => {
+                        delete item._employees;
+                    });
+                });
+
+                metrics.totalEmployerCost = metrics.imssPatron + metrics.infonavitPatron + metrics.retirement + metrics.severanceOldAge;
+
+                return metrics;
+            }
+
+            // ============================================
+            // DASHBOARD UPDATES
+            // ============================================
+
+            function updateAllDashboards() {
+                const metrics = calculateMetrics(state.filteredData);
+
+                updateKPIs(metrics);
+                updateCharts(metrics);
+                updateBreakdowns(metrics);
+                updateTable();
+            }
+
+            function updateKPIs(metrics) {
+                // Main KPIs
+                document.getElementById('kpi-headcount').textContent = formatNumber(metrics.headcount);
+                document.getElementById('kpi-gross').textContent = formatCurrency(metrics.totalGross, true);
+                document.getElementById('kpi-deductions').textContent = formatCurrency(metrics.totalDeductions, true);
+                document.getElementById('kpi-net').textContent = formatCurrency(metrics.totalNet, true);
+                document.getElementById('kpi-employer-cost').textContent = formatCurrency(metrics.totalEmployerCost, true);
+
+                // Secondary KPIs
+                const avgSalary = metrics.headcount > 0 ? metrics.totalSalary / metrics.headcount : 0;
+                document.getElementById('kpi-avg-salary').textContent = formatCurrency(avgSalary);
+                document.getElementById('kpi-overtime').textContent = formatCurrency(metrics.totalOvertime, true);
+
+                const avgSeniority = metrics.headcount > 0 ? metrics.totalSeniority / metrics.headcount : 0;
+                document.getElementById('kpi-avg-seniority').textContent = avgSeniority.toFixed(1);
+
+                const costPerEmp = metrics.headcount > 0 ? metrics.totalGross / metrics.headcount : 0;
+                document.getElementById('kpi-cost-per-emp').textContent = formatCurrency(costPerEmp, true);
+                document.getElementById('kpi-isr').textContent = formatCurrency(metrics.totalISR, true);
+
+                // Employer costs KPIs
+                document.getElementById('kpi-imss-patron').textContent = formatCurrency(metrics.imssPatron, true);
+                document.getElementById('kpi-infonavit-patron').textContent = formatCurrency(metrics.infonavitPatron, true);
+                document.getElementById('kpi-retiro').textContent = formatCurrency(metrics.retirement, true);
+                document.getElementById('kpi-cesantia').textContent = formatCurrency(metrics.severanceOldAge, true);
+            }
+
+            function updateCharts(metrics) {
+                // Cost Structure Chart
+                const topCCs = Object.entries(metrics.byCostCenter)
+                    .sort((a, b) => b[1].total - a[1].total)
+                    .slice(0, CONFIG.MAX_CHART_ITEMS);
+
+                updateChart('costStructureChart', {
+                    type: 'bar',
+                    data: {
+                        labels: topCCs.map(c => c[0].substring(0, 12)),
+                        datasets: [
+                            {
+                                label: 'Sueldo Base',
+                                data: topCCs.map(c => c[1].base),
+                                backgroundColor: CONFIG.COLORS.brandRed,
+                                borderRadius: 4
+                            },
+                            {
+                                label: 'Tiempo Extra',
+                                data: topCCs.map(c => c[1].overtime),
+                                backgroundColor: CONFIG.COLORS.brandDark,
+                                borderRadius: 4
+                            }
+                        ]
+                    },
+                    options: getBarChartOptions()
+                });
+
+                // Job Distribution Chart
+                const topJobs = Object.entries(metrics.byJob)
+                    .sort((a, b) => b[1].total - a[1].total)
+                    .slice(0, CONFIG.MAX_CHART_ITEMS);
+
+                updateChart('jobDistributionChart', {
+                    type: 'bar',
+                    data: {
+                        labels: topJobs.map(j => j[0].substring(0, 15)),
+                        datasets: [{
+                            label: 'Costo Total',
+                            data: topJobs.map(j => j[1].total),
+                            backgroundColor: CONFIG.CHART_COLORS,
+                            borderRadius: 4
+                        }]
+                    },
+                    options: getBarChartOptions(true)
+                });
+
+                // Compensation Breakdown Chart
+                const perceptionData = Object.entries(metrics.perceptions)
+                    .filter(([_, v]) => v > 0)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, CONFIG.MAX_CHART_ITEMS);
+
+                updateChart('compensationChart', {
+                    type: 'doughnut',
+                    data: {
+                        labels: perceptionData.map(p => PERCEPTION_LABELS[p[0]] || p[0]),
+                        datasets: [{
+                            data: perceptionData.map(p => p[1]),
+                            backgroundColor: CONFIG.CHART_COLORS
+                        }]
+                    },
+                    options: getDoughnutChartOptions()
+                });
+
+                // Deductions Breakdown Chart
+                const deductionData = Object.entries(metrics.deductions)
+                    .filter(([_, v]) => v > 0)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, CONFIG.MAX_CHART_ITEMS);
+
+                updateChart('deductionsChart', {
+                    type: 'doughnut',
+                    data: {
+                        labels: deductionData.map(d => DEDUCTION_LABELS[d[0]] || d[0]),
+                        datasets: [{
+                            data: deductionData.map(d => d[1]),
+                            backgroundColor: CONFIG.CHART_COLORS
+                        }]
+                    },
+                    options: getDoughnutChartOptions()
+                });
+
+                // Seniority Distribution Chart
+                updateChart('seniorityChart', {
+                    type: 'bar',
+                    data: {
+                        labels: ['0-1 anos', '1-3 anos', '3-5 anos', '5-10 anos', '10+ anos'],
+                        datasets: [{
+                            label: 'Empleados',
+                            data: Object.values(metrics.bySeniority),
+                            backgroundColor: CONFIG.CHART_COLORS.slice(0, 5),
+                            borderRadius: 4
+                        }]
+                    },
+                    options: getBarChartOptions(true, false)
+                });
+
+                // Division Chart
+                const divisions = Object.entries(metrics.byDivision)
+                    .sort((a, b) => b[1].count - a[1].count)
+                    .slice(0, 10);
+
+                updateChart('divisionChart', {
+                    type: 'bar',
+                    data: {
+                        labels: divisions.map(d => d[0].substring(0, 20)),
+                        datasets: [{
+                            label: 'Empleados',
+                            data: divisions.map(d => d[1].count),
+                            backgroundColor: CONFIG.COLORS.brandRed,
+                            borderRadius: 4
+                        }]
+                    },
+                    options: { ...getBarChartOptions(true, false), indexAxis: 'y' }
+                });
+
+                // Top Jobs by Count Chart
+                const topJobsByCount = Object.entries(metrics.byJob)
+                    .sort((a, b) => b[1].count - a[1].count)
+                    .slice(0, 15);
+
+                updateChart('topJobsChart', {
+                    type: 'bar',
+                    data: {
+                        labels: topJobsByCount.map(j => j[0].substring(0, 20)),
+                        datasets: [{
+                            label: 'Empleados',
+                            data: topJobsByCount.map(j => j[1].count),
+                            backgroundColor: CONFIG.COLORS.brandDark,
+                            borderRadius: 4
+                        }]
+                    },
+                    options: { ...getBarChartOptions(true, false), indexAxis: 'y' }
+                });
+
+                // Perception Category Chart
+                updateChart('perceptionCategoryChart', {
+                    type: 'bar',
+                    data: {
+                        labels: perceptionData.map(p => PERCEPTION_LABELS[p[0]] || p[0]),
+                        datasets: [{
+                            label: 'Total',
+                            data: perceptionData.map(p => p[1]),
+                            backgroundColor: CONFIG.CHART_COLORS,
+                            borderRadius: 4
+                        }]
+                    },
+                    options: getBarChartOptions(true)
+                });
+
+                // Cost by Division Chart
+                const divisionsByCost = Object.entries(metrics.byDivision)
+                    .sort((a, b) => b[1].total - a[1].total)
+                    .slice(0, 10);
+
+                updateChart('costByDivisionChart', {
+                    type: 'bar',
+                    data: {
+                        labels: divisionsByCost.map(d => d[0].substring(0, 15)),
+                        datasets: [{
+                            label: 'Costo Total',
+                            data: divisionsByCost.map(d => d[1].total),
+                            backgroundColor: CONFIG.CHART_COLORS,
+                            borderRadius: 4
+                        }]
+                    },
+                    options: getBarChartOptions(true)
+                });
+
+                // Deduction Type Chart
+                updateChart('deductionTypeChart', {
+                    type: 'bar',
+                    data: {
+                        labels: deductionData.map(d => DEDUCTION_LABELS[d[0]] || d[0]),
+                        datasets: [{
+                            label: 'Total',
+                            data: deductionData.map(d => d[1]),
+                            backgroundColor: CONFIG.CHART_COLORS,
+                            borderRadius: 4
+                        }]
+                    },
+                    options: getBarChartOptions(true)
+                });
+
+                // Employer Costs Chart
+                const employerCostData = [
+                    { label: 'IMSS Patron', value: metrics.imssPatron },
+                    { label: 'INFONAVIT', value: metrics.infonavitPatron },
+                    { label: 'Retiro', value: metrics.retirement },
+                    { label: 'Cesantia y Vejez', value: metrics.severanceOldAge }
+                ].filter(d => d.value > 0);
+
+                updateChart('employerCostsChart', {
+                    type: 'doughnut',
+                    data: {
+                        labels: employerCostData.map(d => d.label),
+                        datasets: [{
+                            data: employerCostData.map(d => d.value),
+                            backgroundColor: [CONFIG.COLORS.brandRed, CONFIG.COLORS.blue, CONFIG.COLORS.amber, CONFIG.COLORS.emerald]
+                        }]
+                    },
+                    options: getDoughnutChartOptions()
+                });
+            }
+
+            function updateChart(canvasId, config) {
+                const canvas = document.getElementById(canvasId);
+                if (!canvas) return;
+
+                if (state.charts[canvasId]) {
+                    state.charts[canvasId].destroy();
+                }
+
+                state.charts[canvasId] = new Chart(canvas.getContext('2d'), config);
+            }
+
+            function getBarChartOptions(horizontal = false, currency = true) {
+                return {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) => currency ? formatCurrency(ctx.parsed.y || ctx.parsed.x) : formatNumber(ctx.parsed.y || ctx.parsed.x)
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            ticks: { font: { size: 9, weight: '600' }, color: '#64748b' }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: '#f1f5f9' },
+                            ticks: {
+                                callback: (v) => currency ? formatCurrency(v, true) : formatNumber(v),
+                                font: { size: 9 }
+                            }
+                        }
+                    }
+                };
+            }
+
+            function getDoughnutChartOptions() {
+                return {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                            labels: { font: { size: 10 }, padding: 10 }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: (ctx) => `${ctx.label}: ${formatCurrency(ctx.parsed)}`
+                            }
+                        }
+                    }
+                };
+            }
+
+            function updateBreakdowns(metrics) {
+                // Workforce Summary
+                const workforceSummary = document.getElementById('workforce-summary');
+                const divisions = Object.entries(metrics.byDivision).sort((a, b) => b[1].count - a[1].count);
+                const specialistCompanies = Object.entries(metrics.bySpecialistCompany).sort((a, b) => b[1].count - a[1].count);
+
+                workforceSummary.innerHTML = `
+                    <div class="metric-row">
+                        <span class="text-slate-600 text-sm">Total Empleados</span>
+                        <span class="font-bold text-brand-dark">${formatNumber(metrics.headcount)}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="text-slate-600 text-sm">Divisiones</span>
+                        <span class="font-bold text-brand-dark">${divisions.length}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="text-slate-600 text-sm">Centros de Costo</span>
+                        <span class="font-bold text-brand-dark">${Object.keys(metrics.byCostCenter).length}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="text-slate-600 text-sm">Puestos Unicos</span>
+                        <span class="font-bold text-brand-dark">${Object.keys(metrics.byJob).length}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="text-slate-600 text-sm">Empresas Especialistas</span>
+                        <span class="font-bold text-brand-dark">${Object.keys(metrics.bySpecialistCompany).length}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="text-slate-600 text-sm">Antiguedad Promedio</span>
+                        <span class="font-bold text-brand-dark">${(metrics.totalSeniority / metrics.headcount || 0).toFixed(1)} anos</span>
+                    </div>
+                    <hr class="my-3 border-slate-200">
+                    <p class="text-[10px] text-slate-400 font-bold uppercase mb-2">Top 5 Divisiones</p>
+                    ${divisions.slice(0, 5).map(([div, data]) => `
+                        <div class="metric-row">
+                            <span class="text-slate-500 text-xs">${escapeHtml(div)}</span>
+                            <span class="font-semibold text-slate-700 text-xs">${formatNumber(data.count)}</span>
+                        </div>
+                    `).join('')}
+                    <hr class="my-3 border-slate-200">
+                    <p class="text-[10px] text-slate-400 font-bold uppercase mb-2">Top 5 Empresas Especialistas</p>
+                    ${specialistCompanies.slice(0, 5).map(([company, data]) => `
+                        <div class="metric-row">
+                            <span class="text-slate-500 text-xs">${escapeHtml(company)}</span>
+                            <span class="font-semibold text-slate-700 text-xs">${formatNumber(data.count)}</span>
+                        </div>
+                    `).join('')}
+                `;
+
+                // Compensation Breakdown
+                const compensationBreakdown = document.getElementById('compensation-breakdown');
+                const sortedPerceptions = Object.entries(metrics.perceptions)
+                    .filter(([_, value]) => value > 0)
+                    .sort((a, b) => b[1] - a[1]);
+
+                compensationBreakdown.innerHTML = `
+                    <div class="metric-row bg-emerald-50 rounded-lg px-3 -mx-3">
+                        <span class="text-emerald-700 font-bold text-sm">TOTAL PERCEPCIONES</span>
+                        <span class="font-black text-emerald-700">${formatCurrency(metrics.totalGross)}</span>
+                    </div>
+                    ${sortedPerceptions.map(([key, value]) => `
+                        <div class="metric-row">
+                            <span class="text-slate-600 text-sm">${PERCEPTION_LABELS[key] || key}</span>
+                            <span class="font-semibold text-slate-700">${formatCurrency(value)}</span>
+                        </div>
+                    `).join('')}
+                `;
+
+                // Deductions Breakdown
+                const deductionsBreakdown = document.getElementById('deductions-breakdown');
+                const sortedDeductions = Object.entries(metrics.deductions)
+                    .filter(([_, value]) => value > 0)
+                    .sort((a, b) => b[1] - a[1]);
+
+                deductionsBreakdown.innerHTML = `
+                    <div class="metric-row bg-rose-50 rounded-lg px-3 -mx-3">
+                        <span class="text-rose-700 font-bold text-sm">TOTAL DEDUCCIONES</span>
+                        <span class="font-black text-rose-700">${formatCurrency(metrics.totalDeductions)}</span>
+                    </div>
+                    ${sortedDeductions.map(([key, value]) => `
+                        <div class="metric-row">
+                            <span class="text-slate-600 text-sm">${DEDUCTION_LABELS[key] || key}</span>
+                            <span class="font-semibold text-slate-700">${formatCurrency(value)}</span>
+                        </div>
+                    `).join('')}
+                `;
+
+                // Employer Costs Breakdown
+                const employerCostsBreakdown = document.getElementById('employer-costs-breakdown');
+                employerCostsBreakdown.innerHTML = `
+                    <div class="metric-row bg-amber-50 rounded-lg px-3 -mx-3">
+                        <span class="text-amber-700 font-bold text-sm">TOTAL CARGAS PATRONALES</span>
+                        <span class="font-black text-amber-700">${formatCurrency(metrics.totalEmployerCost)}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="text-slate-600 text-sm">IMSS Patronal</span>
+                        <span class="font-semibold text-slate-700">${formatCurrency(metrics.imssPatron)}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="text-slate-600 text-sm">INFONAVIT Patron (5%)</span>
+                        <span class="font-semibold text-slate-700">${formatCurrency(metrics.infonavitPatron)}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="text-slate-600 text-sm">Retiro (SAR)</span>
+                        <span class="font-semibold text-slate-700">${formatCurrency(metrics.retirement)}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="text-slate-600 text-sm">Cesantia y Vejez</span>
+                        <span class="font-semibold text-slate-700">${formatCurrency(metrics.severanceOldAge)}</span>
+                    </div>
+                    <hr class="my-3 border-slate-200">
+                    <div class="metric-row">
+                        <span class="text-slate-500 text-xs">Costo Patronal por Empleado</span>
+                        <span class="font-semibold text-slate-600 text-sm">${formatCurrency(metrics.headcount > 0 ? metrics.totalEmployerCost / metrics.headcount : 0)}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="text-slate-500 text-xs">% sobre Nomina Bruta</span>
+                        <span class="font-semibold text-slate-600 text-sm">${((metrics.totalEmployerCost / metrics.totalGross) * 100 || 0).toFixed(2)}%</span>
+                    </div>
+                `;
+            }
+
+            function updateTable() {
+                const tbody = document.getElementById('hr-table-body');
+                const subtitle = document.getElementById('table-subtitle');
+                const paginationInfo = document.getElementById('pagination-info');
+                const showingCount = document.getElementById('showing-count');
+
+                subtitle.textContent = `${state.filteredData.length.toLocaleString()} registros en vista actual`;
+
+                if (state.filteredData.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="10" class="py-20 text-center text-slate-300 italic uppercase tracking-widest text-[10px]">Sin resultados</td></tr>';
+                    paginationInfo.classList.add('hidden');
+                    return;
+                }
+
+                const displayData = state.filteredData.slice(0, CONFIG.MAX_TABLE_ROWS);
+
+                if (state.filteredData.length > CONFIG.MAX_TABLE_ROWS) {
+                    paginationInfo.classList.remove('hidden');
+                    showingCount.textContent = `Mostrando ${CONFIG.MAX_TABLE_ROWS} de ${state.filteredData.length.toLocaleString()} registros. Use los filtros para refinar.`;
+                } else {
+                    paginationInfo.classList.add('hidden');
+                }
+
+                tbody.innerHTML = displayData.map(row => {
+                    const gross = computeGross(row);
+                    const deductions = computeDeductions(row);
+                    const net = computeNet(row, gross, deductions);
+
+                    return `
+                        <tr class="hover:bg-slate-50 transition-all text-xs">
+                            <td class="px-4 py-3 font-mono font-bold text-slate-500">${escapeHtml(row._id)}</td>
+                            <td class="px-4 py-3">
+                                <span class="font-bold text-brand-dark">${escapeHtml(row._name)}</span>
+                            </td>
+                            <td class="px-4 py-3">
+                                <span class="text-slate-600">${escapeHtml(row._job)}</span>
+                            </td>
+                            <td class="px-4 py-3">
+                                <span class="bg-slate-100 text-slate-600 px-2 py-1 rounded text-[10px] font-semibold">${escapeHtml(row._division)}</span>
+                            </td>
+                            <td class="px-4 py-3">
+                                <span class="text-slate-600">${escapeHtml(row._specialistCompany)}</span>
+                            </td>
+                            <td class="px-4 py-3 text-right font-semibold">${formatCurrency(row._dailySalary)}</td>
+                            <td class="px-4 py-3 text-right font-semibold text-emerald-600">${formatCurrency(gross)}</td>
+                            <td class="px-4 py-3 text-right font-semibold text-rose-600">${formatCurrency(deductions)}</td>
+                            <td class="px-4 py-3 text-right font-bold text-blue-600">${formatCurrency(net)}</td>
+                            <td class="px-4 py-3 text-center">
+                                <span class="bg-brand-dark text-white px-2 py-1 rounded text-[10px] font-bold">${row._seniority.toFixed(1)} anos</span>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+
+            // ============================================
+            // INITIALIZATION
+            // ============================================
+
+            function initIcons() {
+                if (typeof lucide !== 'undefined') {
+                    lucide.createIcons();
+                }
+            }
+
+            function initDate() {
+                const dateEl = document.getElementById('current-date');
+                const now = new Date();
+                const formatted = new Intl.DateTimeFormat(CONFIG.DATE_LOCALE, {
+                    month: 'long',
+                    year: 'numeric'
+                }).format(now);
+                dateEl.textContent = formatted.charAt(0).toUpperCase() + formatted.slice(1);
+                dateEl.setAttribute('datetime', now.toISOString().split('T')[0]);
+            }
+
+            function initMobileMenu() {
+                const menuBtn = document.getElementById('mobile-menu-btn');
+                const sidebar = document.getElementById('sidebar');
+                const overlay = document.getElementById('mobile-overlay');
+
+                function toggleMenu(open) {
+                    sidebar.classList.toggle('active', open);
+                    overlay.classList.toggle('active', open);
+                    menuBtn.setAttribute('aria-expanded', open);
+                    document.body.style.overflow = open ? 'hidden' : '';
+                }
+
+                menuBtn.addEventListener('click', () => {
+                    toggleMenu(!sidebar.classList.contains('active'));
+                });
+
+                overlay.addEventListener('click', () => toggleMenu(false));
+
+                document.addEventListener('keydown', (e) => {
+                    if (e.key === 'Escape' && sidebar.classList.contains('active')) {
+                        toggleMenu(false);
+                        menuBtn.focus();
+                    }
+                });
+            }
+
+            function initTabs() {
+                const tabButtons = document.querySelectorAll('.tab-nav');
+                const tabContents = document.querySelectorAll('.tab-content');
+
+                tabButtons.forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const tabId = btn.dataset.tab;
+
+                        tabButtons.forEach(b => {
+                            b.classList.remove('bg-brand-red', 'text-white', 'shadow-lg', 'shadow-brand-red/20');
+                            b.classList.add('text-slate-400', 'hover:bg-white/5', 'hover:text-white');
+                            b.removeAttribute('aria-current');
+                        });
+
+                        btn.classList.add('bg-brand-red', 'text-white', 'shadow-lg', 'shadow-brand-red/20');
+                        btn.classList.remove('text-slate-400', 'hover:bg-white/5', 'hover:text-white');
+                        btn.setAttribute('aria-current', 'page');
+
+                        tabContents.forEach(content => {
+                            content.classList.remove('active');
+                            if (content.id === `tab-${tabId}`) {
+                                content.classList.add('active');
+                            }
+                        });
+
+                        // Close mobile menu if open
+                        const sidebar = document.getElementById('sidebar');
+                        if (sidebar.classList.contains('active')) {
+                            sidebar.classList.remove('active');
+                            document.getElementById('mobile-overlay').classList.remove('active');
+                            document.body.style.overflow = '';
+                        }
+                    });
+                });
+            }
+
+            function setupEventListeners() {
+                // File input
+                document.getElementById('file-input').addEventListener('change', function(e) {
+                    processFile(e.target.files[0]);
+                    this.value = '';
+                });
+
+                // Filters
+                ['division-filter', 'cost-center-filter', 'job-title-filter', 'specialist-company-filter', 'seniority-filter', 'salary-range-filter'].forEach(id => {
+                    document.getElementById(id).addEventListener('change', applyFilters);
+                });
+
+                // Search
+                document.getElementById('table-search').addEventListener('input', debounce(applyFilters, CONFIG.DEBOUNCE_DELAY));
+
+                // Reset filters
+                document.getElementById('reset-filters').addEventListener('click', resetFilters);
+
+                // Drag and drop
+                const mainContent = document.getElementById('main-content');
+
+                mainContent.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    mainContent.classList.add('ring-2', 'ring-brand-red', 'ring-offset-4');
+                });
+
+                mainContent.addEventListener('dragleave', () => {
+                    mainContent.classList.remove('ring-2', 'ring-brand-red', 'ring-offset-4');
+                });
+
+                mainContent.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    mainContent.classList.remove('ring-2', 'ring-brand-red', 'ring-offset-4');
+                    if (e.dataTransfer.files[0]) {
+                        processFile(e.dataTransfer.files[0]);
+                    }
+                });
+            }
+
+            function init() {
+                initIcons();
+                initDate();
+                initMobileMenu();
+                initTabs();
+                setupEventListeners();
+            }
+
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', init);
+            } else {
+                init();
+            }
+
+        })();
+    </script>
+</body>
+</html>
