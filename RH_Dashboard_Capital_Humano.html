@@ -698,6 +698,7 @@
                 DEBOUNCE_DELAY: 300,
                 DATE_LOCALE: 'es-MX',
                 TOAST_DURATION: 4000,
+                PERCEPTION_DIFF_THRESHOLD: 0.001,
                 DEBUG: false,
                 COLORS: {
                     brandRed: '#E30613',
@@ -712,6 +713,24 @@
                     lime: '#84CC16'
                 },
                 CHART_COLORS: ['#E30613', '#2D3134', '#10B981', '#3B82F6', '#F59E0B', '#8B5CF6', '#F43F5E', '#06B6D4', '#F97316', '#84CC16']
+            };
+
+            const RANGE_CONFIG = {
+                endLetter: 'DB',
+                excludeLetter: 'DA',
+                excludeHeader: 'PROMEDIO DE VARIABLES',
+                perceptions: {
+                    startLetter: 'C',
+                    endLetter: 'BA',
+                    startName: 'ASISTENCIA',
+                    endName: 'INSTRUCTOR ESPEJO'
+                },
+                deductions: {
+                    startLetter: 'BC',
+                    endLetter: 'CM',
+                    startName: 'ISR',
+                    endName: 'AJUSTE DE MONEDA'
+                }
             };
 
             const PERCEPTION_KEYS = [
@@ -846,7 +865,7 @@
 
                 // Organization
                 division: ['DIVISION', 'DIV', 'AREA', 'DEPARTAMENTO', 'DEPTO'],
-                costCenter: ['CENTRO', 'CC', 'CENTRO_COSTO', 'COST_CENTER', 'COSTO'],
+                costCenter: ['CENTRO DE COSTOS', 'CENTRO DE COSTO', 'CENTRO', 'C.C.', 'CC', 'CENTRO_COSTO', 'COST_CENTER', 'COSTO'],
                 job: ['PUESTO', 'P_DESC', 'CARGO', 'POSICION', 'CATEGORIA', 'JOB'],
                 specialistCompany: ['EMPRESA ESPECIALISTA', 'EMPRESA_ESPECIALISTA', 'ESPECIALISTA'],
 
@@ -862,7 +881,7 @@
                 otherPerceptions: ['OTRAS PERCEPCIONES', 'OTRAS PERC', 'OTRAS_PERCEPCIONES'],
                 christmasBonus: ['AGUINALDO'],
                 adjustmentDays: ['DIAS DE AJUSTE', 'DIAS_AJUSTE'],
-                productivityBonus: ['PREMIO DE PRODUCTIVIDAD', 'PREMIO_PRODUCTIVIDAD', 'BONO_PRODUCTIVIDAD'],
+                productivityBonus: ['PREMIO DE PRODUCTIVIDAD', 'PREMIO_PRODUCTIVIDAD', 'BONO_PRODUCTIVIDAD', 'PAGO VARIABLE DE PRODUCTIVIDAD'],
                 attendanceBonus: ['PREMIO DE ASISTENCIA', 'PREMIO_ASISTENCIA', 'BONO_ASISTENCIA'],
                 ptu: ['PTU', 'PARTICIPACION'],
                 retroactive: ['RETROACTIVO', 'RETROACTIVOS'],
@@ -877,7 +896,7 @@
 
                 // Deductions
                 isr: ['ISR', 'ISR RETENIDO'],
-                isr131: ['ISR (131)', 'ISR_131'],
+                isr131: ['ISR (131', 'ISR (131)', 'ISR_131'],
                 imss: ['IMSS', 'CUOTA_IMSS', 'IMSS_OBRERO'],
                 credit: ['CREDITO', 'CREDITOS'],
                 infonavit: ['INFONAVIT', 'INFONAVIT_TRABAJADOR'],
@@ -924,6 +943,8 @@
                 filteredData: [],
                 charts: {},
                 columnMapping: {},
+                perceptionColumns: [],
+                deductionColumns: [],
                 isLoading: false,
                 toastTimeout: null
             };
@@ -1053,6 +1074,24 @@
                 return parseNumber(getColumnValue(row, columnKey));
             }
 
+            function getNumericValueByHeader(row, header) {
+                return parseNumber(row[header]);
+            }
+
+            function normalizeHeader(value) {
+                const text = String(value || '').trim();
+                const normalized = text.normalize ? text.normalize('NFD') : text;
+                return normalized
+                    .replace(/[\u0300-\u036f]/g, '')
+                    .replace(/\s+/g, ' ')
+                    .toUpperCase();
+            }
+
+            function findHeaderIndex(headers, target) {
+                const targetNorm = normalizeHeader(target);
+                return headers.findIndex(h => normalizeHeader(h) === targetNorm);
+            }
+
             function setSelectOptions(selectId, values, allLabel) {
                 const select = document.getElementById(selectId);
                 const fragment = document.createDocumentFragment();
@@ -1087,6 +1126,107 @@
             // ============================================
             // COLUMN MAPPING
             // ============================================
+
+            function buildHeadersByLetterRange(headerKeyByLetter, startLetter, endLetter, excludeLetters = []) {
+                const startIdx = XLSX.utils.decode_col(startLetter);
+                const endIdx = XLSX.utils.decode_col(endLetter);
+                const excluded = new Set(excludeLetters.map(l => l.toUpperCase()));
+                const headers = [];
+                for (let idx = startIdx; idx <= endIdx; idx++) {
+                    const letter = XLSX.utils.encode_col(idx);
+                    if (excluded.has(letter)) continue;
+                    if (headerKeyByLetter[letter]) {
+                        headers.push(headerKeyByLetter[letter]);
+                    }
+                }
+                return headers;
+            }
+
+            function buildHeadersByNameRange(headers, startName, endName) {
+                const startIdx = findHeaderIndex(headers, startName);
+                const endIdx = findHeaderIndex(headers, endName);
+                if (startIdx === -1 || endIdx === -1 || endIdx < startIdx) return [];
+                return headers.slice(startIdx, endIdx + 1);
+            }
+
+            function filterPayloadToAllowedColumns(payload) {
+                if (payload.headerKeyByLetter) {
+                    const headers = buildHeadersByLetterRange(
+                        payload.headerKeyByLetter,
+                        'A',
+                        RANGE_CONFIG.endLetter,
+                        [RANGE_CONFIG.excludeLetter]
+                    );
+                    const headerKeyByLetter = {};
+                    Object.entries(payload.headerKeyByLetter).forEach(([letter, header]) => {
+                        if (headers.includes(header)) {
+                            headerKeyByLetter[letter] = header;
+                        }
+                    });
+                    const data = payload.data.map(row => {
+                        const obj = {};
+                        headers.forEach(header => {
+                            obj[header] = row[header];
+                        });
+                        return obj;
+                    });
+                    return { data, headers, headerKeyByLetter };
+                }
+
+                const endIndex = findHeaderIndex(payload.headers, 'EMPRESA ESPECIALISTA');
+                const maxIndex = endIndex === -1 ? payload.headers.length - 1 : endIndex;
+                const headers = payload.headers
+                    .slice(0, maxIndex + 1)
+                    .filter(h => normalizeHeader(h) !== normalizeHeader(RANGE_CONFIG.excludeHeader));
+                const data = payload.data.map(row => {
+                    const obj = {};
+                    headers.forEach(header => {
+                        obj[header] = row[header];
+                    });
+                    return obj;
+                });
+                return { data, headers };
+            }
+
+            function setRangeColumns(payload) {
+                if (payload.headerKeyByLetter) {
+                    state.perceptionColumns = buildHeadersByLetterRange(
+                        payload.headerKeyByLetter,
+                        RANGE_CONFIG.perceptions.startLetter,
+                        RANGE_CONFIG.perceptions.endLetter
+                    );
+                    state.deductionColumns = buildHeadersByLetterRange(
+                        payload.headerKeyByLetter,
+                        RANGE_CONFIG.deductions.startLetter,
+                        RANGE_CONFIG.deductions.endLetter
+                    );
+                } else {
+                    state.perceptionColumns = buildHeadersByNameRange(
+                        payload.headers,
+                        RANGE_CONFIG.perceptions.startName,
+                        RANGE_CONFIG.perceptions.endName
+                    );
+                    state.deductionColumns = buildHeadersByNameRange(
+                        payload.headers,
+                        RANGE_CONFIG.deductions.startName,
+                        RANGE_CONFIG.deductions.endName
+                    );
+                }
+
+                logDebug('Perception columns:', state.perceptionColumns);
+                logDebug('Deduction columns:', state.deductionColumns);
+            }
+
+            function findLastHeaderMatch(headers, patterns) {
+                const patternsUpper = patterns.map(p => p.toUpperCase());
+                for (let i = headers.length - 1; i >= 0; i--) {
+                    const headerUpper = headers[i].toUpperCase();
+                    if (patternsUpper.some(p => headerUpper === p || headerUpper.includes(p))) {
+                        return headers[i];
+                    }
+                }
+                return null;
+            }
 
             function buildExcelData(sheet) {
                 const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
@@ -1226,13 +1366,22 @@
                 const excelOverrides = {
                     job: 'CX',
                     seniority: 'CY',
-                    specialistCompany: 'DB'
+                    specialistCompany: 'DB',
+                    costCenter: 'CV'
                 };
 
                 for (const [key, letter] of Object.entries(excelOverrides)) {
                     if (headerKeyByLetter[letter]) {
                         state.columnMapping[key] = headerKeyByLetter[letter];
                     }
+                }
+
+                if (!headerKeyByLetter || Object.keys(headerKeyByLetter).length === 0) {
+                    const jobHeader = findLastHeaderMatch(headers, ['PUESTO']);
+                    if (jobHeader) state.columnMapping.job = jobHeader;
+
+                    const costHeader = findLastHeaderMatch(headers, ['CENTRO DE COSTOS', 'CENTRO DE COSTO', 'CENTRO DE C', 'C.C.', 'CC']);
+                    if (costHeader) state.columnMapping.costCenter = costHeader;
                 }
 
                 logDebug('Column mapping:', state.columnMapping);
@@ -1271,13 +1420,17 @@
                             const workbook = XLSX.read(new Uint8Array(evt.target.result), { type: 'array' });
                             const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
                             const excelPayload = buildExcelData(firstSheet);
-                            data = excelPayload.data;
-                            mapColumns(excelPayload.headers, excelPayload.headerKeyByLetter);
+                            const trimmedPayload = filterPayloadToAllowedColumns(excelPayload);
+                            data = trimmedPayload.data;
+                            mapColumns(trimmedPayload.headers, trimmedPayload.headerKeyByLetter);
+                            setRangeColumns(trimmedPayload);
                         } else {
                             const text = evt.target.result;
                             const csvPayload = buildCsvData(text);
-                            data = csvPayload.data;
-                            mapColumns(csvPayload.headers);
+                            const trimmedPayload = filterPayloadToAllowedColumns(csvPayload);
+                            data = trimmedPayload.data;
+                            mapColumns(trimmedPayload.headers);
+                            setRangeColumns(trimmedPayload);
                         }
 
                         if (data.length === 0) {
@@ -1433,18 +1586,36 @@
                 return keys.reduce((sum, key) => sum + getNumericValue(row, key), 0);
             }
 
+            function sumHeaderFields(row, headers) {
+                return headers.reduce((sum, header) => sum + getNumericValueByHeader(row, header), 0);
+            }
+
+            function computeCalculatedGross(row) {
+                if (state.perceptionColumns && state.perceptionColumns.length) {
+                    return sumHeaderFields(row, state.perceptionColumns);
+                }
+                return sumFields(row, PERCEPTION_SUM_KEYS);
+            }
+
             function computeGross(row) {
                 if (state.columnMapping.totalPerception) {
                     return getNumericValue(row, 'totalPerception');
                 }
-                return sumFields(row, PERCEPTION_SUM_KEYS);
+                return computeCalculatedGross(row);
+            }
+
+            function computeCalculatedDeductions(row) {
+                if (state.deductionColumns && state.deductionColumns.length) {
+                    return sumHeaderFields(row, state.deductionColumns);
+                }
+                return sumFields(row, DEDUCTION_SUM_KEYS);
             }
 
             function computeDeductions(row) {
                 if (state.columnMapping.totalDeduction) {
                     return getNumericValue(row, 'totalDeduction');
                 }
-                return sumFields(row, DEDUCTION_SUM_KEYS);
+                return computeCalculatedDeductions(row);
             }
 
             function computeNet(row, gross, deductions) {
@@ -1455,6 +1626,15 @@
             }
 
             function calculateMetrics(data) {
+                const perceptionBreakdownKeys = (state.perceptionColumns && state.perceptionColumns.length)
+                    ? state.perceptionColumns
+                    : PERCEPTION_KEYS;
+                const deductionBreakdownKeys = (state.deductionColumns && state.deductionColumns.length)
+                    ? state.deductionColumns
+                    : DEDUCTION_KEYS;
+                const useDynamicPerceptions = perceptionBreakdownKeys === state.perceptionColumns;
+                const useDynamicDeductions = deductionBreakdownKeys === state.deductionColumns;
+
                 const metrics = {
                     headcount: 0,
                     totalGross: 0,
@@ -1465,6 +1645,8 @@
                     totalOvertime: 0,
                     totalSeniority: 0,
                     totalISR: 0,
+                    perceptionDiffCount: 0,
+                    perceptionDiffAmount: 0,
 
                     // Employer costs breakdown
                     imssPatron: 0,
@@ -1473,13 +1655,13 @@
                     severanceOldAge: 0,
 
                     // Perception breakdown
-                    perceptions: PERCEPTION_KEYS.reduce((acc, key) => {
+                    perceptions: perceptionBreakdownKeys.reduce((acc, key) => {
                         acc[key] = 0;
                         return acc;
                     }, {}),
 
                     // Deduction breakdown
-                    deductions: DEDUCTION_KEYS.reduce((acc, key) => {
+                    deductions: deductionBreakdownKeys.reduce((acc, key) => {
                         acc[key] = 0;
                         return acc;
                     }, {}),
@@ -1514,12 +1696,19 @@
 
                     // Calculate totals from each row
                     const gross = computeGross(row);
+                    const calculatedGross = computeCalculatedGross(row);
                     const deductions = computeDeductions(row);
                     const netValue = computeNet(row, gross, deductions);
 
                     metrics.totalGross += gross;
                     metrics.totalDeductions += deductions;
                     metrics.totalNet += netValue;
+
+                    const grossDiff = calculatedGross - gross;
+                    if (Math.abs(grossDiff) > CONFIG.PERCEPTION_DIFF_THRESHOLD) {
+                        metrics.perceptionDiffCount += 1;
+                        metrics.perceptionDiffAmount += Math.abs(grossDiff);
+                    }
 
                     metrics.totalOvertime += getNumericValue(row, 'overtimeDouble') + getNumericValue(row, 'overtimeTriple');
                     metrics.totalISR += getNumericValue(row, 'isr') + getNumericValue(row, 'isr131');
@@ -1531,17 +1720,29 @@
                     metrics.severanceOldAge += getNumericValue(row, 'severanceOldAge');
 
                     // Perceptions breakdown
-                    PERCEPTION_KEYS.forEach(key => {
-                        metrics.perceptions[key] += getNumericValue(row, key);
-                    });
+                    if (useDynamicPerceptions) {
+                        perceptionBreakdownKeys.forEach(header => {
+                            metrics.perceptions[header] += getNumericValueByHeader(row, header);
+                        });
+                    } else {
+                        PERCEPTION_KEYS.forEach(key => {
+                            metrics.perceptions[key] += getNumericValue(row, key);
+                        });
+                    }
 
-                    // Deductions breakdown (aggregate ISR and Prestamos)
-                    metrics.deductions.isr += getNumericValue(row, 'isr') + getNumericValue(row, 'isr131');
-                    metrics.deductions.loan += getNumericValue(row, 'loan') + getNumericValue(row, 'specialLoan');
-                    DEDUCTION_KEYS.forEach(key => {
-                        if (key === 'isr' || key === 'loan') return;
-                        metrics.deductions[key] += getNumericValue(row, key);
-                    });
+                    if (useDynamicDeductions) {
+                        deductionBreakdownKeys.forEach(header => {
+                            metrics.deductions[header] += getNumericValueByHeader(row, header);
+                        });
+                    } else {
+                        // Deductions breakdown (aggregate ISR and Prestamos)
+                        metrics.deductions.isr += getNumericValue(row, 'isr') + getNumericValue(row, 'isr131');
+                        metrics.deductions.loan += getNumericValue(row, 'loan') + getNumericValue(row, 'specialLoan');
+                        DEDUCTION_KEYS.forEach(key => {
+                            if (key === 'isr' || key === 'loan') return;
+                            metrics.deductions[key] += getNumericValue(row, key);
+                        });
+                    }
 
                     // By groupings
                     const division = row._division;
@@ -1925,6 +2126,14 @@
                     <div class="metric-row">
                         <span class="text-slate-600 text-sm">Antiguedad Promedio</span>
                         <span class="font-bold text-brand-dark">${(metrics.totalSeniority / metrics.headcount || 0).toFixed(1)} anos</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="text-slate-600 text-sm">Diferencias Percepciones</span>
+                        <span class="font-bold text-brand-dark">${formatNumber(metrics.perceptionDiffCount)}</span>
+                    </div>
+                    <div class="metric-row">
+                        <span class="text-slate-600 text-sm">Monto Diferencias</span>
+                        <span class="font-bold text-brand-dark">${formatCurrency(metrics.perceptionDiffAmount)}</span>
                     </div>
                     <hr class="my-3 border-slate-200">
                     <p class="text-[10px] text-slate-400 font-bold uppercase mb-2">Top 5 Divisiones</p>
