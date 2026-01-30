@@ -514,10 +514,22 @@
                 <div id="tab-workforce" class="tab-content space-y-6">
                     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         <section class="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                            <h2 class="text-base font-black text-brand-dark mb-6">Distribucion de Plantilla por Division</h2>
-                            <p class="text-[10px] text-slate-400 font-medium uppercase -mt-4 mb-4">Empleados unicos</p>
+                            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-2">
+                                <div>
+                                    <h2 class="text-base font-black text-brand-dark">Distribucion de Plantilla por Division</h2>
+                                    <p class="text-[10px] text-slate-400 font-medium uppercase mt-1">Empleados unicos / Percepciones</p>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <button type="button" data-chart="division" data-mode="count" class="chart-toggle px-3 py-1 rounded-full border border-slate-200 bg-white text-slate-500 text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all">Empleados</button>
+                                    <button type="button" data-chart="division" data-mode="total" class="chart-toggle px-3 py-1 rounded-full border border-slate-200 bg-white text-slate-500 text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all">Percepciones</button>
+                                </div>
+                            </div>
                             <div class="chart-wrapper-lg">
                                 <canvas id="divisionChart"></canvas>
+                            </div>
+                            <div class="mt-4 rounded-xl bg-slate-50 p-4">
+                                <p class="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-2">Top 5 Divisiones</p>
+                                <div id="division-toplist" class="space-y-1 text-xs text-slate-600"></div>
                             </div>
                         </section>
 
@@ -530,10 +542,22 @@
                     </div>
 
                     <section class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                        <h2 class="text-base font-black text-brand-dark mb-6">Top 15 Puestos por Numero de Empleados</h2>
-                        <p class="text-[10px] text-slate-400 font-medium uppercase -mt-4 mb-4">Empleados unicos</p>
+                        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-2">
+                            <div>
+                                <h2 class="text-base font-black text-brand-dark">Top 15 Puestos por Numero de Empleados</h2>
+                                <p class="text-[10px] text-slate-400 font-medium uppercase mt-1">Empleados unicos / Percepciones</p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button type="button" data-chart="jobs" data-mode="count" class="chart-toggle px-3 py-1 rounded-full border border-slate-200 bg-white text-slate-500 text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all">Empleados</button>
+                                <button type="button" data-chart="jobs" data-mode="total" class="chart-toggle px-3 py-1 rounded-full border border-slate-200 bg-white text-slate-500 text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all">Percepciones</button>
+                            </div>
+                        </div>
                         <div class="chart-wrapper-lg">
                             <canvas id="topJobsChart"></canvas>
+                        </div>
+                        <div class="mt-4 rounded-xl bg-slate-50 p-4">
+                            <p class="text-[10px] text-slate-400 font-black uppercase tracking-widest mb-2">Top 5 Puestos</p>
+                            <div id="jobs-toplist" class="space-y-1 text-xs text-slate-600"></div>
                         </div>
                     </section>
                 </div>
@@ -895,6 +919,10 @@
                 deductionColumns: [],
                 currentPage: 1,
                 pageSize: CONFIG.MAX_TABLE_ROWS,
+                chartModes: {
+                    division: 'count',
+                    jobs: 'count'
+                },
                 isLoading: false,
                 toastTimeout: null
             };
@@ -1784,7 +1812,9 @@
                 updateKPIs(metrics);
                 updateCharts(metrics);
                 updateBreakdowns(metrics);
+                updateTopLists(metrics);
                 updateTable();
+                updateChartToggleUI();
             }
 
             function updateKPIs(metrics) {
@@ -1856,7 +1886,7 @@
                             borderRadius: 4
                         }]
                     },
-                    options: getBarChartOptions(true)
+                    options: { ...getBarChartOptions(true, true, 'Percepciones'), indexAxis: 'y' }
                 });
 
                 // Compensation Breakdown Chart
@@ -1907,12 +1937,16 @@
                             borderRadius: 4
                         }]
                     },
-                    options: getBarChartOptions(true, false, 'Empleados')
+                    options: { ...getBarChartOptions(true, false, 'Empleados'), indexAxis: 'y' }
                 });
 
-                // Division Chart
+                // Division Chart (toggle)
+                const divisionMode = state.chartModes.division;
+                const divisionValueKey = divisionMode === 'count' ? 'count' : 'total';
+                const divisionLabel = divisionMode === 'count' ? 'Empleados' : 'Percepciones';
+                const divisionCurrency = divisionMode !== 'count';
                 const divisions = Object.entries(metrics.byDivision)
-                    .sort((a, b) => b[1].count - a[1].count)
+                    .sort((a, b) => b[1][divisionValueKey] - a[1][divisionValueKey])
                     .slice(0, 10);
 
                 updateChart('divisionChart', {
@@ -1920,18 +1954,22 @@
                     data: {
                         labels: divisions.map(d => toLabel(d[0], 20)),
                         datasets: [{
-                            label: 'Empleados',
-                            data: divisions.map(d => d[1].count),
+                            label: divisionLabel,
+                            data: divisions.map(d => d[1][divisionValueKey]),
                             backgroundColor: CONFIG.COLORS.brandRed,
                             borderRadius: 4
                         }]
                     },
-                    options: { ...getBarChartOptions(true, false, 'Empleados'), indexAxis: 'y' }
+                    options: { ...getBarChartOptions(true, divisionCurrency, divisionLabel), indexAxis: 'y' }
                 });
 
-                // Top Jobs by Count Chart
+                // Top Jobs Chart (toggle)
+                const jobsMode = state.chartModes.jobs;
+                const jobsValueKey = jobsMode === 'count' ? 'count' : 'total';
+                const jobsLabel = jobsMode === 'count' ? 'Empleados' : 'Percepciones';
+                const jobsCurrency = jobsMode !== 'count';
                 const topJobsByCount = Object.entries(metrics.byJob)
-                    .sort((a, b) => b[1].count - a[1].count)
+                    .sort((a, b) => b[1][jobsValueKey] - a[1][jobsValueKey])
                     .slice(0, 15);
 
                 updateChart('topJobsChart', {
@@ -1939,13 +1977,13 @@
                     data: {
                         labels: topJobsByCount.map(j => toLabel(j[0], 20)),
                         datasets: [{
-                            label: 'Empleados',
-                            data: topJobsByCount.map(j => j[1].count),
+                            label: jobsLabel,
+                            data: topJobsByCount.map(j => j[1][jobsValueKey]),
                             backgroundColor: CONFIG.COLORS.brandDark,
                             borderRadius: 4
                         }]
                     },
-                    options: { ...getBarChartOptions(true, false, 'Empleados'), indexAxis: 'y' }
+                    options: { ...getBarChartOptions(true, jobsCurrency, jobsLabel), indexAxis: 'y' }
                 });
 
                 // Perception Category Chart
@@ -2021,6 +2059,56 @@
                     state.charts.employerCostsChart.destroy();
                     delete state.charts.employerCostsChart;
                 }
+            }
+
+            function updateChartToggleUI() {
+                document.querySelectorAll('.chart-toggle').forEach(btn => {
+                    const chartKey = btn.getAttribute('data-chart');
+                    const mode = btn.getAttribute('data-mode');
+                    const active = state.chartModes[chartKey] === mode;
+                    btn.classList.toggle('bg-brand-red', active);
+                    btn.classList.toggle('text-white', active);
+                    btn.classList.toggle('border-brand-red', active);
+                    btn.classList.toggle('shadow-sm', active);
+                    btn.classList.toggle('bg-white', !active);
+                    btn.classList.toggle('text-slate-500', !active);
+                    btn.classList.toggle('border-slate-200', !active);
+                });
+            }
+
+            function renderTopList(containerId, items, formatter, emptyLabel) {
+                const container = document.getElementById(containerId);
+                if (!container) return;
+                if (!items.length) {
+                    container.innerHTML = `<p class="text-slate-400 text-xs italic">${emptyLabel}</p>`;
+                    return;
+                }
+                container.innerHTML = items.map(([label, value]) => `
+                    <div class="flex items-center justify-between gap-3">
+                        <span class="truncate">${escapeHtml(label)}</span>
+                        <span class="font-semibold text-slate-700">${formatter(value)}</span>
+                    </div>
+                `).join('');
+            }
+
+            function updateTopLists(metrics) {
+                const divisionMode = state.chartModes.division;
+                const divisionValueKey = divisionMode === 'count' ? 'count' : 'total';
+                const divisionFormatter = divisionMode === 'count' ? formatNumber : formatCurrency;
+                const divisionTop = Object.entries(metrics.byDivision)
+                    .sort((a, b) => b[1][divisionValueKey] - a[1][divisionValueKey])
+                    .slice(0, 5)
+                    .map(([label, data]) => [label, data[divisionValueKey]]);
+                renderTopList('division-toplist', divisionTop, divisionFormatter, 'Sin datos de divisiones');
+
+                const jobsMode = state.chartModes.jobs;
+                const jobsValueKey = jobsMode === 'count' ? 'count' : 'total';
+                const jobsFormatter = jobsMode === 'count' ? formatNumber : formatCurrency;
+                const jobsTop = Object.entries(metrics.byJob)
+                    .sort((a, b) => b[1][jobsValueKey] - a[1][jobsValueKey])
+                    .slice(0, 5)
+                    .map(([label, data]) => [label, data[jobsValueKey]]);
+                renderTopList('jobs-toplist', jobsTop, jobsFormatter, 'Sin datos de puestos');
             }
 
             function updateChart(canvasId, config) {
@@ -2407,6 +2495,18 @@
                 // Reset filters
                 document.getElementById('reset-filters').addEventListener('click', resetFilters);
 
+                // Chart toggles
+                document.querySelectorAll('.chart-toggle').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const chartKey = btn.getAttribute('data-chart');
+                        const mode = btn.getAttribute('data-mode');
+                        if (chartKey && mode && state.chartModes[chartKey] !== mode) {
+                            state.chartModes[chartKey] = mode;
+                            updateAllDashboards();
+                        }
+                    });
+                });
+
                 // Pagination
                 const prevBtn = document.getElementById('prev-page');
                 const nextBtn = document.getElementById('next-page');
@@ -2453,6 +2553,7 @@
                 initMobileMenu();
                 initTabs();
                 setupEventListeners();
+                updateChartToggleUI();
             }
 
             if (document.readyState === 'loading') {
