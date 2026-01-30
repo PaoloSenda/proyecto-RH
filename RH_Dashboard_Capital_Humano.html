@@ -515,6 +515,7 @@
                     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         <section class="lg:col-span-2 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
                             <h2 class="text-base font-black text-brand-dark mb-6">Distribucion de Plantilla por Division</h2>
+                            <p class="text-[10px] text-slate-400 font-medium uppercase -mt-4 mb-4">Empleados unicos</p>
                             <div class="chart-wrapper-lg">
                                 <canvas id="divisionChart"></canvas>
                             </div>
@@ -530,6 +531,7 @@
 
                     <section class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
                         <h2 class="text-base font-black text-brand-dark mb-6">Top 15 Puestos por Numero de Empleados</h2>
+                        <p class="text-[10px] text-slate-400 font-medium uppercase -mt-4 mb-4">Empleados unicos</p>
                         <div class="chart-wrapper-lg">
                             <canvas id="topJobsChart"></canvas>
                         </div>
@@ -1905,7 +1907,7 @@
                             borderRadius: 4
                         }]
                     },
-                    options: getBarChartOptions(true, false)
+                    options: getBarChartOptions(true, false, 'Empleados')
                 });
 
                 // Division Chart
@@ -1924,7 +1926,7 @@
                             borderRadius: 4
                         }]
                     },
-                    options: { ...getBarChartOptions(true, false), indexAxis: 'y' }
+                    options: { ...getBarChartOptions(true, false, 'Empleados'), indexAxis: 'y' }
                 });
 
                 // Top Jobs by Count Chart
@@ -1943,7 +1945,7 @@
                             borderRadius: 4
                         }]
                     },
-                    options: { ...getBarChartOptions(true, false), indexAxis: 'y' }
+                    options: { ...getBarChartOptions(true, false, 'Empleados'), indexAxis: 'y' }
                 });
 
                 // Perception Category Chart
@@ -2032,7 +2034,7 @@
                 state.charts[canvasId] = new Chart(canvas.getContext('2d'), config);
             }
 
-            function getBarChartOptions(horizontal = false, currency = true) {
+            function getBarChartOptions(horizontal = false, currency = true, labelPrefix = '') {
                 const valueFormatter = (v) => currency ? formatCurrency(v, true) : formatNumber(v);
                 return {
                     responsive: true,
@@ -2041,7 +2043,11 @@
                         legend: { display: false },
                         tooltip: {
                             callbacks: {
-                                label: (ctx) => valueFormatter(ctx.parsed.y || ctx.parsed.x)
+                                label: (ctx) => {
+                                    const value = horizontal ? ctx.parsed.x : ctx.parsed.y;
+                                    const formatted = valueFormatter(value);
+                                    return labelPrefix ? `${labelPrefix}: ${formatted}` : formatted;
+                                }
                             }
                         }
                     },
