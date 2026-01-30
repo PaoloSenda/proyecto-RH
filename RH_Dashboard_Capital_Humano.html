@@ -663,7 +663,6 @@
                                         <th scope="col" class="px-4 py-4">Puesto</th>
                                         <th scope="col" class="px-4 py-4">Division</th>
                                         <th scope="col" class="px-4 py-4">Empresa Especialista</th>
-                                        <th scope="col" class="px-4 py-4 text-right">Salario Diario</th>
                                         <th scope="col" class="px-4 py-4 text-right">Percepciones</th>
                                         <th scope="col" class="px-4 py-4 text-right">Deducciones</th>
                                         <th scope="col" class="px-4 py-4 text-right">Neto</th>
@@ -671,7 +670,7 @@
                                     </tr>
                                 </thead>
                                 <tbody id="hr-table-body" class="divide-y divide-slate-100 text-sm">
-                                    <tr><td colspan="10" class="py-20 text-center text-slate-300 italic uppercase tracking-widest text-[10px]">Arrastre su archivo CSV o Excel aqui</td></tr>
+                                    <tr><td colspan="9" class="py-20 text-center text-slate-300 italic uppercase tracking-widest text-[10px]">Arrastre su archivo CSV o Excel aqui</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -1590,6 +1589,27 @@
                 return headers.reduce((sum, header) => sum + getNumericValueByHeader(row, header), 0);
             }
 
+            function getOfficialPerception(row) {
+                if (state.columnMapping.totalPerception) {
+                    return getNumericValue(row, 'totalPerception');
+                }
+                return 0;
+            }
+
+            function getOfficialDeduction(row) {
+                if (state.columnMapping.totalDeduction) {
+                    return getNumericValue(row, 'totalDeduction');
+                }
+                return 0;
+            }
+
+            function getOfficialNet(row) {
+                if (state.columnMapping.totalNet) {
+                    return getNumericValue(row, 'totalNet');
+                }
+                return 0;
+            }
+
             function computeCalculatedGross(row) {
                 if (state.perceptionColumns && state.perceptionColumns.length) {
                     return sumHeaderFields(row, state.perceptionColumns);
@@ -1598,10 +1618,11 @@
             }
 
             function computeGross(row) {
-                if (state.columnMapping.totalPerception) {
-                    return getNumericValue(row, 'totalPerception');
-                }
-                return computeCalculatedGross(row);
+                const official = getOfficialPerception(row);
+                const calculated = computeCalculatedGross(row);
+                if (official > 0) return official;
+                if (official === 0 && calculated > 0) return calculated;
+                return official;
             }
 
             function computeCalculatedDeductions(row) {
@@ -1612,17 +1633,18 @@
             }
 
             function computeDeductions(row) {
-                if (state.columnMapping.totalDeduction) {
-                    return getNumericValue(row, 'totalDeduction');
-                }
-                return computeCalculatedDeductions(row);
+                const official = getOfficialDeduction(row);
+                const calculated = computeCalculatedDeductions(row);
+                if (official > 0) return official;
+                if (official === 0 && calculated > 0) return calculated;
+                return official;
             }
 
             function computeNet(row, gross, deductions) {
-                if (state.columnMapping.totalNet) {
-                    return getNumericValue(row, 'totalNet');
-                }
-                return gross - deductions;
+                const official = getOfficialNet(row);
+                if (official > 0) return official;
+                if (official === 0 && (gross !== 0 || deductions !== 0)) return gross - deductions;
+                return official;
             }
 
             function calculateMetrics(data) {
@@ -1695,8 +1717,9 @@
                     }
 
                     // Calculate totals from each row
-                    const gross = computeGross(row);
+                    const officialGross = getOfficialPerception(row);
                     const calculatedGross = computeCalculatedGross(row);
+                    const gross = computeGross(row);
                     const deductions = computeDeductions(row);
                     const netValue = computeNet(row, gross, deductions);
 
@@ -1704,10 +1727,12 @@
                     metrics.totalDeductions += deductions;
                     metrics.totalNet += netValue;
 
-                    const grossDiff = calculatedGross - gross;
-                    if (Math.abs(grossDiff) > CONFIG.PERCEPTION_DIFF_THRESHOLD) {
-                        metrics.perceptionDiffCount += 1;
-                        metrics.perceptionDiffAmount += Math.abs(grossDiff);
+                    if (state.columnMapping.totalPerception) {
+                        const grossDiff = calculatedGross - officialGross;
+                        if (Math.abs(grossDiff) > CONFIG.PERCEPTION_DIFF_THRESHOLD) {
+                            metrics.perceptionDiffCount += 1;
+                            metrics.perceptionDiffAmount += Math.abs(grossDiff);
+                        }
                     }
 
                     metrics.totalOvertime += getNumericValue(row, 'overtimeDouble') + getNumericValue(row, 'overtimeTriple');
@@ -1833,6 +1858,9 @@
             }
 
             function updateCharts(metrics) {
+                const employerCostAvailable = ['imssPatron', 'infonavitPatron', 'retirement', 'severanceOldAge']
+                    .some(key => state.columnMapping[key]);
+
                 // Cost Structure Chart
                 const topCCs = Object.entries(metrics.byCostCenter)
                     .sort((a, b) => b[1].total - a[1].total)
@@ -2025,17 +2053,22 @@
                     { label: 'Cesantia y Vejez', value: metrics.severanceOldAge }
                 ].filter(d => d.value > 0);
 
-                updateChart('employerCostsChart', {
-                    type: 'doughnut',
-                    data: {
-                        labels: employerCostData.map(d => d.label),
-                        datasets: [{
-                            data: employerCostData.map(d => d.value),
-                            backgroundColor: [CONFIG.COLORS.brandRed, CONFIG.COLORS.blue, CONFIG.COLORS.amber, CONFIG.COLORS.emerald]
-                        }]
-                    },
-                    options: getDoughnutChartOptions()
-                });
+                if (employerCostAvailable && employerCostData.length > 0) {
+                    updateChart('employerCostsChart', {
+                        type: 'doughnut',
+                        data: {
+                            labels: employerCostData.map(d => d.label),
+                            datasets: [{
+                                data: employerCostData.map(d => d.value),
+                                backgroundColor: [CONFIG.COLORS.brandRed, CONFIG.COLORS.blue, CONFIG.COLORS.amber, CONFIG.COLORS.emerald]
+                            }]
+                        },
+                        options: getDoughnutChartOptions()
+                    });
+                } else if (state.charts.employerCostsChart) {
+                    state.charts.employerCostsChart.destroy();
+                    delete state.charts.employerCostsChart;
+                }
             }
 
             function updateChart(canvasId, config) {
@@ -2193,37 +2226,46 @@
 
                 // Employer Costs Breakdown
                 const employerCostsBreakdown = document.getElementById('employer-costs-breakdown');
-                employerCostsBreakdown.innerHTML = `
-                    <div class="metric-row bg-amber-50 rounded-lg px-3 -mx-3">
-                        <span class="text-amber-700 font-bold text-sm">TOTAL CARGAS PATRONALES</span>
-                        <span class="font-black text-amber-700">${formatCurrency(metrics.totalEmployerCost)}</span>
-                    </div>
-                    <div class="metric-row">
-                        <span class="text-slate-600 text-sm">IMSS Patronal</span>
-                        <span class="font-semibold text-slate-700">${formatCurrency(metrics.imssPatron)}</span>
-                    </div>
-                    <div class="metric-row">
-                        <span class="text-slate-600 text-sm">INFONAVIT Patron (5%)</span>
-                        <span class="font-semibold text-slate-700">${formatCurrency(metrics.infonavitPatron)}</span>
-                    </div>
-                    <div class="metric-row">
-                        <span class="text-slate-600 text-sm">Retiro (SAR)</span>
-                        <span class="font-semibold text-slate-700">${formatCurrency(metrics.retirement)}</span>
-                    </div>
-                    <div class="metric-row">
-                        <span class="text-slate-600 text-sm">Cesantia y Vejez</span>
-                        <span class="font-semibold text-slate-700">${formatCurrency(metrics.severanceOldAge)}</span>
-                    </div>
-                    <hr class="my-3 border-slate-200">
-                    <div class="metric-row">
-                        <span class="text-slate-500 text-xs">Costo Patronal por Empleado</span>
-                        <span class="font-semibold text-slate-600 text-sm">${formatCurrency(metrics.headcount > 0 ? metrics.totalEmployerCost / metrics.headcount : 0)}</span>
-                    </div>
-                    <div class="metric-row">
-                        <span class="text-slate-500 text-xs">% sobre Nomina Bruta</span>
-                        <span class="font-semibold text-slate-600 text-sm">${((metrics.totalEmployerCost / metrics.totalGross) * 100 || 0).toFixed(2)}%</span>
-                    </div>
-                `;
+                const employerCostAvailable = ['imssPatron', 'infonavitPatron', 'retirement', 'severanceOldAge']
+                    .some(key => state.columnMapping[key]);
+
+                if (!employerCostAvailable) {
+                    employerCostsBreakdown.innerHTML = `
+                        <p class="text-slate-400 text-sm italic">Cargas patronales no disponibles (columnas excluidas).</p>
+                    `;
+                } else {
+                    employerCostsBreakdown.innerHTML = `
+                        <div class="metric-row bg-amber-50 rounded-lg px-3 -mx-3">
+                            <span class="text-amber-700 font-bold text-sm">TOTAL CARGAS PATRONALES</span>
+                            <span class="font-black text-amber-700">${formatCurrency(metrics.totalEmployerCost)}</span>
+                        </div>
+                        <div class="metric-row">
+                            <span class="text-slate-600 text-sm">IMSS Patronal</span>
+                            <span class="font-semibold text-slate-700">${formatCurrency(metrics.imssPatron)}</span>
+                        </div>
+                        <div class="metric-row">
+                            <span class="text-slate-600 text-sm">INFONAVIT Patron (5%)</span>
+                            <span class="font-semibold text-slate-700">${formatCurrency(metrics.infonavitPatron)}</span>
+                        </div>
+                        <div class="metric-row">
+                            <span class="text-slate-600 text-sm">Retiro (SAR)</span>
+                            <span class="font-semibold text-slate-700">${formatCurrency(metrics.retirement)}</span>
+                        </div>
+                        <div class="metric-row">
+                            <span class="text-slate-600 text-sm">Cesantia y Vejez</span>
+                            <span class="font-semibold text-slate-700">${formatCurrency(metrics.severanceOldAge)}</span>
+                        </div>
+                        <hr class="my-3 border-slate-200">
+                        <div class="metric-row">
+                            <span class="text-slate-500 text-xs">Costo Patronal por Empleado</span>
+                            <span class="font-semibold text-slate-600 text-sm">${formatCurrency(metrics.headcount > 0 ? metrics.totalEmployerCost / metrics.headcount : 0)}</span>
+                        </div>
+                        <div class="metric-row">
+                            <span class="text-slate-500 text-xs">% sobre Nomina Bruta</span>
+                            <span class="font-semibold text-slate-600 text-sm">${((metrics.totalEmployerCost / metrics.totalGross) * 100 || 0).toFixed(2)}%</span>
+                        </div>
+                    `;
+                }
             }
 
             function updateTable() {
@@ -2235,7 +2277,7 @@
                 subtitle.textContent = `${state.filteredData.length.toLocaleString()} registros en vista actual`;
 
                 if (state.filteredData.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="10" class="py-20 text-center text-slate-300 italic uppercase tracking-widest text-[10px]">Sin resultados</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="9" class="py-20 text-center text-slate-300 italic uppercase tracking-widest text-[10px]">Sin resultados</td></tr>';
                     paginationInfo.classList.add('hidden');
                     return;
                 }
@@ -2269,7 +2311,6 @@
                             <td class="px-4 py-3">
                                 <span class="text-slate-600">${escapeHtml(row._specialistCompany)}</span>
                             </td>
-                            <td class="px-4 py-3 text-right font-semibold">${formatCurrency(row._dailySalary)}</td>
                             <td class="px-4 py-3 text-right font-semibold text-emerald-600">${formatCurrency(gross)}</td>
                             <td class="px-4 py-3 text-right font-semibold text-rose-600">${formatCurrency(deductions)}</td>
                             <td class="px-4 py-3 text-right font-bold text-blue-600">${formatCurrency(net)}</td>
