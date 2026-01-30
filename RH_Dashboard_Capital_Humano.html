@@ -202,10 +202,6 @@
                         <i data-lucide="receipt" class="w-5 h-5" aria-hidden="true"></i>
                         <span>Deducciones</span>
                     </button>
-                    <button type="button" data-tab="employer-costs" class="tab-nav w-full flex items-center gap-4 p-3 hover:bg-white/5 rounded-xl transition-all text-slate-400 hover:text-white">
-                        <i data-lucide="landmark" class="w-5 h-5" aria-hidden="true"></i>
-                        <span>Cargas Patronales</span>
-                    </button>
                 </nav>
 
                 <div class="mt-8">
@@ -278,7 +274,7 @@
                             <time id="current-date" class="text-[10px] font-bold opacity-80 uppercase tracking-widest" datetime="">--</time>
                         </div>
                         <h2 id="hero-title" class="text-2xl xl:text-3xl font-black tracking-tight">Analisis Integral de Nomina</h2>
-                        <p class="text-white/70 text-sm max-w-lg mt-1 font-medium italic">Visibilidad completa: percepciones, deducciones, cargas patronales y metricas de plantilla.</p>
+                        <p class="text-white/70 text-sm max-w-lg mt-1 font-medium italic">Visibilidad completa: percepciones, deducciones y metricas de plantilla.</p>
                     </div>
                 </section>
 
@@ -386,16 +382,6 @@
                                 <p class="text-[9px] text-slate-400 font-bold">Percepciones - Deducciones</p>
                             </div>
 
-                            <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 stat-card border-b-4 border-b-amber-500">
-                                <div class="flex justify-between items-start mb-2">
-                                    <div>
-                                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Carga Patronal</p>
-                                        <h3 id="kpi-employer-cost" class="text-2xl font-black text-amber-600" aria-live="polite">$0</h3>
-                                    </div>
-                                    <div class="p-2 bg-amber-50 text-amber-600 rounded-xl" aria-hidden="true"><i data-lucide="landmark" class="w-4 h-4"></i></div>
-                                </div>
-                                <p class="text-[9px] text-slate-400 font-bold">IMSS + INFONAVIT Patron</p>
-                            </div>
                         </div>
                     </section>
 
@@ -406,12 +392,12 @@
                             <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 stat-card">
                                 <div class="flex justify-between items-start mb-2">
                                     <div>
-                                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Salario Promedio</p>
+                                        <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Percepcion Promedio</p>
                                         <h3 id="kpi-avg-salary" class="text-2xl font-black text-brand-dark" aria-live="polite">$0</h3>
                                     </div>
                                     <div class="p-2 bg-slate-50 text-slate-500 rounded-xl" aria-hidden="true"><i data-lucide="calculator" class="w-4 h-4"></i></div>
                                 </div>
-                                <p class="text-[9px] text-slate-400 font-bold">Por dia</p>
+                                <p class="text-[9px] text-slate-400 font-bold">Por empleado</p>
                             </div>
 
                             <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 stat-card">
@@ -466,16 +452,8 @@
                         <section class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm" aria-labelledby="chart-cost-title">
                             <div class="flex justify-between items-center mb-6">
                                 <div>
-                                    <h2 id="chart-cost-title" class="text-base font-black text-brand-dark">Estructura de Costos</h2>
-                                    <p class="text-[10px] text-slate-400 font-medium uppercase">Por Centro de Costo (Top 8)</p>
-                                </div>
-                                <div class="flex gap-2">
-                                    <span class="flex items-center gap-1 text-[9px] font-bold text-slate-500">
-                                        <span class="w-2 h-2 bg-[#E30613] rounded-full"></span>Base
-                                    </span>
-                                    <span class="flex items-center gap-1 text-[9px] font-bold text-slate-500">
-                                        <span class="w-2 h-2 bg-[#2D3134] rounded-full"></span>T.Extra
-                                    </span>
+                                    <h2 id="chart-cost-title" class="text-base font-black text-brand-dark">Costo Total por Centro de Costos</h2>
+                                    <p class="text-[10px] text-slate-400 font-medium uppercase">Top 8 por percepciones</p>
                                 </div>
                             </div>
                             <div class="chart-wrapper">
@@ -603,44 +581,6 @@
                     </div>
                 </div>
 
-                <!-- Tab Content: Employer Costs -->
-                <div id="tab-employer-costs" class="tab-content space-y-6">
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 stat-card">
-                            <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">IMSS Patronal</p>
-                            <h3 id="kpi-imss-patron" class="text-xl font-black text-brand-dark">$0</h3>
-                        </div>
-                        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 stat-card">
-                            <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">INFONAVIT Patron</p>
-                            <h3 id="kpi-infonavit-patron" class="text-xl font-black text-brand-dark">$0</h3>
-                        </div>
-                        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 stat-card">
-                            <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Retiro (SAR)</p>
-                            <h3 id="kpi-retiro" class="text-xl font-black text-brand-dark">$0</h3>
-                        </div>
-                        <div class="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 stat-card">
-                            <p class="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Cesantia y Vejez</p>
-                            <h3 id="kpi-cesantia" class="text-xl font-black text-brand-dark">$0</h3>
-                        </div>
-                    </div>
-
-                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                        <section class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                            <h2 class="text-base font-black text-brand-dark mb-4">Desglose de Cargas Patronales</h2>
-                            <div id="employer-costs-breakdown" class="space-y-1 max-h-[350px] overflow-y-auto scrollbar-thin">
-                                <p class="text-slate-400 text-sm italic">Cargue datos para ver el desglose</p>
-                            </div>
-                        </section>
-
-                        <section class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-                            <h2 class="text-base font-black text-brand-dark mb-6">Composicion Cargas Patronales</h2>
-                            <div class="chart-wrapper">
-                                <canvas id="employerCostsChart"></canvas>
-                            </div>
-                        </section>
-                    </div>
-                </div>
-
                 <!-- Tab Content: Detailed -->
                 <div id="tab-detailed" class="tab-content">
                     <section class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -675,7 +615,14 @@
                             </table>
                         </div>
                         <div id="pagination-info" class="hidden px-6 py-4 bg-slate-50 border-t border-slate-100 text-xs text-slate-500">
-                            <span id="showing-count"></span>
+                            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                                <span id="showing-count"></span>
+                                <div class="flex items-center gap-2">
+                                    <button id="prev-page" type="button" class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 font-semibold text-xs hover:bg-slate-100 transition-all disabled:opacity-40 disabled:cursor-not-allowed">Anterior</button>
+                                    <span id="page-indicator" class="text-slate-500 font-semibold text-xs"></span>
+                                    <button id="next-page" type="button" class="px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 font-semibold text-xs hover:bg-slate-100 transition-all disabled:opacity-40 disabled:cursor-not-allowed">Siguiente</button>
+                                </div>
+                            </div>
                         </div>
                     </section>
                 </div>
@@ -944,6 +891,8 @@
                 columnMapping: {},
                 perceptionColumns: [],
                 deductionColumns: [],
+                currentPage: 1,
+                pageSize: CONFIG.MAX_TABLE_ROWS,
                 isLoading: false,
                 toastTimeout: null
             };
@@ -972,6 +921,11 @@
                     .replace(/[\u0300-\u036f]/g, '')
                     .toLowerCase()
                     .trim();
+            }
+
+            function toLabel(value, maxLength = 20) {
+                const text = String(value ?? '').trim();
+                return maxLength ? text.slice(0, maxLength) : text;
             }
 
             function parseNumber(value) {
@@ -1540,6 +1494,7 @@
                     return true;
                 });
 
+                state.currentPage = 1;
                 updateFilterStatus();
                 updateAllDashboards();
             }
@@ -1836,11 +1791,10 @@
                 document.getElementById('kpi-gross').textContent = formatCurrency(metrics.totalGross, true);
                 document.getElementById('kpi-deductions').textContent = formatCurrency(metrics.totalDeductions, true);
                 document.getElementById('kpi-net').textContent = formatCurrency(metrics.totalNet, true);
-                document.getElementById('kpi-employer-cost').textContent = formatCurrency(metrics.totalEmployerCost, true);
 
                 // Secondary KPIs
-                const avgSalary = metrics.headcount > 0 ? metrics.totalSalary / metrics.headcount : 0;
-                document.getElementById('kpi-avg-salary').textContent = formatCurrency(avgSalary);
+                const avgPerception = metrics.headcount > 0 ? metrics.totalGross / metrics.headcount : 0;
+                document.getElementById('kpi-avg-salary').textContent = formatCurrency(avgPerception);
                 document.getElementById('kpi-overtime').textContent = formatCurrency(metrics.totalOvertime, true);
 
                 const avgSeniority = metrics.headcount > 0 ? metrics.totalSeniority / metrics.headcount : 0;
@@ -1851,10 +1805,14 @@
                 document.getElementById('kpi-isr').textContent = formatCurrency(metrics.totalISR, true);
 
                 // Employer costs KPIs
-                document.getElementById('kpi-imss-patron').textContent = formatCurrency(metrics.imssPatron, true);
-                document.getElementById('kpi-infonavit-patron').textContent = formatCurrency(metrics.infonavitPatron, true);
-                document.getElementById('kpi-retiro').textContent = formatCurrency(metrics.retirement, true);
-                document.getElementById('kpi-cesantia').textContent = formatCurrency(metrics.severanceOldAge, true);
+                const imssPatronEl = document.getElementById('kpi-imss-patron');
+                if (imssPatronEl) imssPatronEl.textContent = formatCurrency(metrics.imssPatron, true);
+                const infonavitPatronEl = document.getElementById('kpi-infonavit-patron');
+                if (infonavitPatronEl) infonavitPatronEl.textContent = formatCurrency(metrics.infonavitPatron, true);
+                const retiroEl = document.getElementById('kpi-retiro');
+                if (retiroEl) retiroEl.textContent = formatCurrency(metrics.retirement, true);
+                const cesantiaEl = document.getElementById('kpi-cesantia');
+                if (cesantiaEl) cesantiaEl.textContent = formatCurrency(metrics.severanceOldAge, true);
             }
 
             function updateCharts(metrics) {
@@ -1869,21 +1827,13 @@
                 updateChart('costStructureChart', {
                     type: 'bar',
                     data: {
-                        labels: topCCs.map(c => c[0].substring(0, 12)),
-                        datasets: [
-                            {
-                                label: 'Sueldo Base',
-                                data: topCCs.map(c => c[1].base),
-                                backgroundColor: CONFIG.COLORS.brandRed,
-                                borderRadius: 4
-                            },
-                            {
-                                label: 'Tiempo Extra',
-                                data: topCCs.map(c => c[1].overtime),
-                                backgroundColor: CONFIG.COLORS.brandDark,
-                                borderRadius: 4
-                            }
-                        ]
+                        labels: topCCs.map(c => toLabel(c[0], 12)),
+                        datasets: [{
+                            label: 'Percepciones Totales',
+                            data: topCCs.map(c => c[1].total),
+                            backgroundColor: CONFIG.COLORS.brandRed,
+                            borderRadius: 4
+                        }]
                     },
                     options: getBarChartOptions()
                 });
@@ -1896,7 +1846,7 @@
                 updateChart('jobDistributionChart', {
                     type: 'bar',
                     data: {
-                        labels: topJobs.map(j => j[0].substring(0, 15)),
+                        labels: topJobs.map(j => toLabel(j[0], 15)),
                         datasets: [{
                             label: 'Costo Total',
                             data: topJobs.map(j => j[1].total),
@@ -1966,7 +1916,7 @@
                 updateChart('divisionChart', {
                     type: 'bar',
                     data: {
-                        labels: divisions.map(d => d[0].substring(0, 20)),
+                        labels: divisions.map(d => toLabel(d[0], 20)),
                         datasets: [{
                             label: 'Empleados',
                             data: divisions.map(d => d[1].count),
@@ -1985,7 +1935,7 @@
                 updateChart('topJobsChart', {
                     type: 'bar',
                     data: {
-                        labels: topJobsByCount.map(j => j[0].substring(0, 20)),
+                        labels: topJobsByCount.map(j => toLabel(j[0], 20)),
                         datasets: [{
                             label: 'Empleados',
                             data: topJobsByCount.map(j => j[1].count),
@@ -2019,7 +1969,7 @@
                 updateChart('costByDivisionChart', {
                     type: 'bar',
                     data: {
-                        labels: divisionsByCost.map(d => d[0].substring(0, 15)),
+                        labels: divisionsByCost.map(d => toLabel(d[0], 15)),
                         datasets: [{
                             label: 'Costo Total',
                             data: divisionsByCost.map(d => d[1].total),
@@ -2083,6 +2033,7 @@
             }
 
             function getBarChartOptions(horizontal = false, currency = true) {
+                const valueFormatter = (v) => currency ? formatCurrency(v, true) : formatNumber(v);
                 return {
                     responsive: true,
                     maintainAspectRatio: false,
@@ -2090,20 +2041,30 @@
                         legend: { display: false },
                         tooltip: {
                             callbacks: {
-                                label: (ctx) => currency ? formatCurrency(ctx.parsed.y || ctx.parsed.x) : formatNumber(ctx.parsed.y || ctx.parsed.x)
+                                label: (ctx) => valueFormatter(ctx.parsed.y || ctx.parsed.x)
                             }
                         }
                     },
                     scales: {
-                        x: {
-                            grid: { display: false },
-                            ticks: { font: { size: 9, weight: '600' }, color: '#64748b' }
-                        },
-                        y: {
+                        x: horizontal ? {
                             beginAtZero: true,
                             grid: { color: '#f1f5f9' },
                             ticks: {
-                                callback: (v) => currency ? formatCurrency(v, true) : formatNumber(v),
+                                callback: (v) => valueFormatter(v),
+                                font: { size: 9 }
+                            }
+                        } : {
+                            grid: { display: false },
+                            ticks: { font: { size: 9, weight: '600' }, color: '#64748b' }
+                        },
+                        y: horizontal ? {
+                            grid: { display: false },
+                            ticks: { font: { size: 9 }, color: '#64748b' }
+                        } : {
+                            beginAtZero: true,
+                            grid: { color: '#f1f5f9' },
+                            ticks: {
+                                callback: (v) => valueFormatter(v),
                                 font: { size: 9 }
                             }
                         }
@@ -2226,45 +2187,47 @@
 
                 // Employer Costs Breakdown
                 const employerCostsBreakdown = document.getElementById('employer-costs-breakdown');
-                const employerCostAvailable = ['imssPatron', 'infonavitPatron', 'retirement', 'severanceOldAge']
-                    .some(key => state.columnMapping[key]);
+                if (employerCostsBreakdown) {
+                    const employerCostAvailable = ['imssPatron', 'infonavitPatron', 'retirement', 'severanceOldAge']
+                        .some(key => state.columnMapping[key]);
 
-                if (!employerCostAvailable) {
-                    employerCostsBreakdown.innerHTML = `
-                        <p class="text-slate-400 text-sm italic">Cargas patronales no disponibles (columnas excluidas).</p>
-                    `;
-                } else {
-                    employerCostsBreakdown.innerHTML = `
-                        <div class="metric-row bg-amber-50 rounded-lg px-3 -mx-3">
-                            <span class="text-amber-700 font-bold text-sm">TOTAL CARGAS PATRONALES</span>
-                            <span class="font-black text-amber-700">${formatCurrency(metrics.totalEmployerCost)}</span>
-                        </div>
-                        <div class="metric-row">
-                            <span class="text-slate-600 text-sm">IMSS Patronal</span>
-                            <span class="font-semibold text-slate-700">${formatCurrency(metrics.imssPatron)}</span>
-                        </div>
-                        <div class="metric-row">
-                            <span class="text-slate-600 text-sm">INFONAVIT Patron (5%)</span>
-                            <span class="font-semibold text-slate-700">${formatCurrency(metrics.infonavitPatron)}</span>
-                        </div>
-                        <div class="metric-row">
-                            <span class="text-slate-600 text-sm">Retiro (SAR)</span>
-                            <span class="font-semibold text-slate-700">${formatCurrency(metrics.retirement)}</span>
-                        </div>
-                        <div class="metric-row">
-                            <span class="text-slate-600 text-sm">Cesantia y Vejez</span>
-                            <span class="font-semibold text-slate-700">${formatCurrency(metrics.severanceOldAge)}</span>
-                        </div>
-                        <hr class="my-3 border-slate-200">
-                        <div class="metric-row">
-                            <span class="text-slate-500 text-xs">Costo Patronal por Empleado</span>
-                            <span class="font-semibold text-slate-600 text-sm">${formatCurrency(metrics.headcount > 0 ? metrics.totalEmployerCost / metrics.headcount : 0)}</span>
-                        </div>
-                        <div class="metric-row">
-                            <span class="text-slate-500 text-xs">% sobre Nomina Bruta</span>
-                            <span class="font-semibold text-slate-600 text-sm">${((metrics.totalEmployerCost / metrics.totalGross) * 100 || 0).toFixed(2)}%</span>
-                        </div>
-                    `;
+                    if (!employerCostAvailable) {
+                        employerCostsBreakdown.innerHTML = `
+                            <p class="text-slate-400 text-sm italic">Cargas patronales no disponibles (columnas excluidas).</p>
+                        `;
+                    } else {
+                        employerCostsBreakdown.innerHTML = `
+                            <div class="metric-row bg-amber-50 rounded-lg px-3 -mx-3">
+                                <span class="text-amber-700 font-bold text-sm">TOTAL CARGAS PATRONALES</span>
+                                <span class="font-black text-amber-700">${formatCurrency(metrics.totalEmployerCost)}</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="text-slate-600 text-sm">IMSS Patronal</span>
+                                <span class="font-semibold text-slate-700">${formatCurrency(metrics.imssPatron)}</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="text-slate-600 text-sm">INFONAVIT Patron (5%)</span>
+                                <span class="font-semibold text-slate-700">${formatCurrency(metrics.infonavitPatron)}</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="text-slate-600 text-sm">Retiro (SAR)</span>
+                                <span class="font-semibold text-slate-700">${formatCurrency(metrics.retirement)}</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="text-slate-600 text-sm">Cesantia y Vejez</span>
+                                <span class="font-semibold text-slate-700">${formatCurrency(metrics.severanceOldAge)}</span>
+                            </div>
+                            <hr class="my-3 border-slate-200">
+                            <div class="metric-row">
+                                <span class="text-slate-500 text-xs">Costo Patronal por Empleado</span>
+                                <span class="font-semibold text-slate-600 text-sm">${formatCurrency(metrics.headcount > 0 ? metrics.totalEmployerCost / metrics.headcount : 0)}</span>
+                            </div>
+                            <div class="metric-row">
+                                <span class="text-slate-500 text-xs">% sobre Nomina Bruta</span>
+                                <span class="font-semibold text-slate-600 text-sm">${((metrics.totalEmployerCost / metrics.totalGross) * 100 || 0).toFixed(2)}%</span>
+                            </div>
+                        `;
+                    }
                 }
             }
 
@@ -2273,6 +2236,9 @@
                 const subtitle = document.getElementById('table-subtitle');
                 const paginationInfo = document.getElementById('pagination-info');
                 const showingCount = document.getElementById('showing-count');
+                const prevBtn = document.getElementById('prev-page');
+                const nextBtn = document.getElementById('next-page');
+                const pageIndicator = document.getElementById('page-indicator');
 
                 subtitle.textContent = `${state.filteredData.length.toLocaleString()} registros en vista actual`;
 
@@ -2282,11 +2248,23 @@
                     return;
                 }
 
-                const displayData = state.filteredData.slice(0, CONFIG.MAX_TABLE_ROWS);
+                const totalRows = state.filteredData.length;
+                const totalPages = Math.max(1, Math.ceil(totalRows / state.pageSize));
 
-                if (state.filteredData.length > CONFIG.MAX_TABLE_ROWS) {
+                if (state.currentPage > totalPages) {
+                    state.currentPage = totalPages;
+                }
+
+                const startIdx = (state.currentPage - 1) * state.pageSize;
+                const endIdx = Math.min(startIdx + state.pageSize, totalRows);
+                const displayData = state.filteredData.slice(startIdx, endIdx);
+
+                if (totalPages > 1) {
                     paginationInfo.classList.remove('hidden');
-                    showingCount.textContent = `Mostrando ${CONFIG.MAX_TABLE_ROWS} de ${state.filteredData.length.toLocaleString()} registros. Use los filtros para refinar.`;
+                    showingCount.textContent = `Mostrando ${startIdx + 1}-${endIdx} de ${totalRows.toLocaleString()} registros.`;
+                    pageIndicator.textContent = `Pagina ${state.currentPage} de ${totalPages}`;
+                    prevBtn.disabled = state.currentPage === 1;
+                    nextBtn.disabled = state.currentPage === totalPages;
                 } else {
                     paginationInfo.classList.add('hidden');
                 }
@@ -2315,7 +2293,7 @@
                             <td class="px-4 py-3 text-right font-semibold text-rose-600">${formatCurrency(deductions)}</td>
                             <td class="px-4 py-3 text-right font-bold text-blue-600">${formatCurrency(net)}</td>
                             <td class="px-4 py-3 text-center">
-                                <span class="bg-brand-dark text-white px-2 py-1 rounded text-[10px] font-bold">${row._seniority.toFixed(1)} anos</span>
+                                <span class="bg-slate-100 text-slate-700 px-2 py-1 rounded text-[10px] font-bold">${row._seniority.toFixed(1)} anos</span>
                             </td>
                         </tr>
                     `;
@@ -2422,6 +2400,25 @@
 
                 // Reset filters
                 document.getElementById('reset-filters').addEventListener('click', resetFilters);
+
+                // Pagination
+                const prevBtn = document.getElementById('prev-page');
+                const nextBtn = document.getElementById('next-page');
+                if (prevBtn && nextBtn) {
+                    prevBtn.addEventListener('click', () => {
+                        if (state.currentPage > 1) {
+                            state.currentPage -= 1;
+                            updateTable();
+                        }
+                    });
+                    nextBtn.addEventListener('click', () => {
+                        const totalPages = Math.max(1, Math.ceil(state.filteredData.length / state.pageSize));
+                        if (state.currentPage < totalPages) {
+                            state.currentPage += 1;
+                            updateTable();
+                        }
+                    });
+                }
 
                 // Drag and drop
                 const mainContent = document.getElementById('main-content');
